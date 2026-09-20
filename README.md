@@ -6,8 +6,8 @@ AI Usage Monitorは、ローカルにインストールされたCodexの`app-ser
 ソースコードとして公開しています。
 
 <p align="center">
-  <img src="docs/assets/desktop-widget-dark-1228x896.png" alt="ダークモードのAI Usage Monitorとデスクトップウィジェット" width="49%">
-  <img src="docs/assets/desktop-widget-light-1228x896.png" alt="ライトモードのAI Usage Monitorとデスクトップウィジェット" width="49%">
+  <img src="docs/assets/desktop-widget-dark-top-right-1228x896.png" alt="ダークモードのAI Usage Monitorとデスクトップウィジェット" width="49%">
+  <img src="docs/assets/desktop-widget-light-top-right-1228x896.png" alt="ライトモードのAI Usage Monitorとデスクトップウィジェット" width="49%">
   <br>
   <sub>ダークモード（左）とライトモード（右）の表示例</sub>
 </p>

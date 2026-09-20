@@ -6,10 +6,6 @@ AI Usage Monitorは、ローカルにインストールされたCodexの`app-ser
 ソースコードとして公開しています。
 
 <p align="center">
-  <img src="docs/assets/ai-usage-monitor.png" alt="ダーク表示でバンクリセットと週間利用状況を表示するAI Usage Monitor" width="394">
-</p>
-
-<p align="center">
   <img src="docs/assets/desktop-widget-example.png" alt="AI Usage Monitorのメニューバー画面とデスクトップウィジェットを並べた表示例" width="760">
   <br>
   <sub>メニューバー画面とデスクトップウィジェットを並べた表示例</sub>

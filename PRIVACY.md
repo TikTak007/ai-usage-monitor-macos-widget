@@ -1,36 +1,36 @@
-# Privacy
+# プライバシー
 
-AI Usage Monitor is designed to run entirely on the user's Mac.
+AI Usage Monitorは、すべての処理が利用者のMac内で完結するように設計しています。
 
-## Data processed
+## 処理するデータ
 
-AI Usage Monitor asks the locally installed Codex app-server for usage-limit data. It
-normalizes and displays quota names, used and remaining percentages, reset
-times, banked reset summaries, connection state, and update time.
+AI Usage Monitorは、ローカルにインストールされたCodexの`app-server`へ利用上限データを
+問い合わせます。利用枠名、使用率、残量、リセット時刻、バンクリセットの概要、接続状態、
+更新時刻を正規化して表示します。
 
-## Data stored
+## 保存するデータ
 
-The app stores its appearance preference, notification boundary state, and a
-small pace-estimation history in local user defaults. The pace history is
-limited to 64 samples per quota bucket. AI Usage Monitor does not add analytics,
-advertising identifiers, or telemetry.
+アプリは、表示設定、通知済み境界の状態、利用ペース推定用の小さな履歴を、ローカルの
+ユーザー設定へ保存します。利用ペースの履歴は、利用枠ごとに最大64件です。
+AI Usage Monitorは、アクセス解析、広告識別子、テレメトリーを追加しません。
 
-## Widget data
+## ウィジェットへ渡すデータ
 
-The menu bar app provides the widget with a normalized snapshot through an
-HTTP listener bound only to `127.0.0.1`. No credential, token, account record,
-or raw app-server response is intentionally sent to the widget.
+メニューバーアプリは、`127.0.0.1`だけで待ち受けるHTTP通信を通じて、正規化済みの
+スナップショットをウィジェットへ渡します。認証情報、トークン、アカウント情報、
+`app-server`の未加工応答を、意図的にウィジェットへ送ることはありません。
 
-## Authentication
+## 認証
 
-Codex owns sign-in and token refresh. AI Usage Monitor does not intentionally read
-`~/.codex/auth.json`, request an API key, or store an access token.
+ログインとトークン更新はCodexが担当します。AI Usage Monitorが
+`~/.codex/auth.json`を意図的に読み取ること、APIキーを要求すること、
+アクセストークンを保存することはありません。
 
-## Network boundary
+## ネットワークの境界
 
-AI Usage Monitor itself does not add a third-party backend. The local Codex app-server
-may communicate with OpenAI under the user's existing OpenAI account and
-applicable terms. That traffic belongs to Codex, not to an AI Usage Monitor service.
+AI Usage Monitor自体は、第三者のバックエンドを追加しません。ローカルのCodex
+`app-server`は、利用者の既存OpenAIアカウントと適用される利用条件に基づいて、
+OpenAIと通信する場合があります。この通信はCodexによるものであり、
+AI Usage Monitorが提供する外部サービスによるものではありません。
 
-Review the source before use and avoid sharing diagnostic output without
-checking it first.
+使用前にソースコードを確認し、診断結果は内容を確認せずに共有しないでください。

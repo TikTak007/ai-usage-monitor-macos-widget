@@ -1,31 +1,30 @@
-# Security policy
+# セキュリティポリシー
 
-## Supported version
+## 対応バージョン
 
-Only the latest commit on the default branch is supported. This is a small
-community project and does not promise a particular response or maintenance
-window.
+標準ブランチの最新コミットだけをサポート対象とします。このプロジェクトは小規模な
+コミュニティプロジェクトであり、一定の応答時間や保守期間を保証するものではありません。
 
-## Reporting a vulnerability
+## 脆弱性の報告
 
-Do not open a public issue containing credentials, tokens, account details,
-private usage values, machine-specific paths, or raw provider responses.
-Instead, use the repository owner's private security-reporting channel when
-one is configured. If no private channel is available, open a minimal public
-issue that contains no sensitive details and asks how to report privately.
+認証情報、トークン、アカウント情報、非公開の利用状況、Mac固有のパス、提供元からの
+未加工応答を含む公開Issueは作成しないでください。リポジトリ所有者が非公開の
+セキュリティ報告窓口を設定している場合は、そちらを使用してください。非公開窓口がない
+場合は、機密情報を一切含めず、非公開での報告方法だけを尋ねる最小限のIssueを作成して
+ください。
 
-## Security boundaries
+## セキュリティ上の境界
 
-- AI Usage Monitor must not read, copy, print, or persist Codex authentication files.
-- The widget bridge must remain bound to IPv4 loopback (`127.0.0.1`).
-- Only normalized usage fields may cross the widget bridge.
-- The project must not redeem banked resets, alter account settings, bypass
-  usage limits, or disable macOS security controls.
-- Build and installation instructions must not require `sudo`.
+- AI Usage Monitorは、Codexの認証ファイルを読み取り、コピー、表示、保存してはなりません。
+- ウィジェット連携の待ち受け先は、IPv4のループバック（`127.0.0.1`）に限定します。
+- ウィジェット連携を通過できるのは、正規化済みの利用状況項目だけです。
+- バンクリセットの使用、アカウント設定の変更、利用上限の回避、macOSのセキュリティ機能の
+  無効化を行ってはなりません。
+- ビルドおよびインストール手順は、`sudo`を必要としてはなりません。
 
-## Local build trust
+## ローカルビルドの信頼性
 
-This repository distributes source, not a prebuilt binary. Review the source
-and build scripts before running them. An Apple Development signature is
-recommended for reliable WidgetKit discovery; do not work around a signing
-failure by disabling Gatekeeper or other platform protections.
+このリポジトリはビルド済みアプリではなく、ソースコードを配布します。実行前に
+ソースコードとビルドスクリプトを確認してください。WidgetKitから安定して検出される
+よう、Apple Development署名を推奨します。署名の失敗を回避するためにGatekeeperや
+その他のプラットフォーム保護機能を無効化しないでください。

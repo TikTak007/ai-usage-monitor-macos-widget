@@ -204,3 +204,12 @@ OpenAIに帰属します。最新の[OpenAIデザインガイドライン](https
 
 ソースコードは[MITライセンス](LICENSE)で公開しています。第三者の製品名および商標は、
 MITライセンスの対象には含まれません。
+
+### ChatGPTアプリ更新後にCodexが見つからない場合
+
+macOSアプリは、ChatGPT.appとCodex.appの新しい
+`Contents/Resources/codex-cli/bin/codex`と、以前の
+`Contents/Resources/codex`を自動検出します。HomebrewとPATHからの検出も維持しています。
+古いMonitorで「Codex was not found」が表示された場合は、最新ソースから
+再ビルドしてください。`CODEX_BIN`で明示する場合は、Monitorを起動する
+プロセスの環境変数として設定する必要があります。

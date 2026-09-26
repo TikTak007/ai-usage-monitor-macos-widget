@@ -37,10 +37,19 @@ mkdir -p "$contents_dir/PlugIns"
 cp "$executable" "$contents_dir/MacOS/CodexUsageMonitor"
 cp "$project_dir/macos/Info.plist" "$contents_dir/Info.plist"
 cp "$project_dir/macos/AppIcon.icns" "$contents_dir/Resources/AppIcon.icns"
+xcrun actool \
+    "$project_dir/macos/Assets.xcassets" \
+    --compile "$contents_dir/Resources" \
+    --platform macosx \
+    --minimum-deployment-target 13.0 \
+    --app-icon AppIcon \
+    --output-partial-info-plist "$project_dir/.build/app-icon-info.plist" \
+    --output-format human-readable-text
 rm -rf "$widget_dir"
 /usr/bin/ditto "$widget_product" "$widget_dir"
 mkdir -p "$widget_dir/Contents/Resources"
-cp "$project_dir/macos/AppIcon.icns" "$widget_dir/Contents/Resources/AppIcon.icns"
+cp "$contents_dir/Resources/AppIcon.icns" "$widget_dir/Contents/Resources/AppIcon.icns"
+cp "$contents_dir/Resources/Assets.car" "$widget_dir/Contents/Resources/Assets.car"
 
 codesign \
     --force \

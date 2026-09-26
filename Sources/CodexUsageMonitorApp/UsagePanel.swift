@@ -98,10 +98,12 @@ struct UsagePanel: View {
                 LazyVStack(spacing: 10) {
                     ResetCreditsCard(summary: snapshot.resetCredits)
                     ForEach(Array(snapshot.limits.prefix(2))) { limit in
-                        LimitCard(limit: limit, paceEstimates: model.paceEstimates)
+                        LimitCard(limit: limit, paceEstimates: model.paceEstimates,
+                                  weeklyHistories: model.weeklyHistories, observedAt: snapshot.updatedAt)
                     }
                     ForEach(Array(snapshot.limits.dropFirst(2))) { limit in
-                        LimitCard(limit: limit, paceEstimates: model.paceEstimates)
+                        LimitCard(limit: limit, paceEstimates: model.paceEstimates,
+                                  weeklyHistories: model.weeklyHistories, observedAt: snapshot.updatedAt)
                     }
                     if case .failed(let message) = model.state {
                         ErrorBanner(message: message)
@@ -158,7 +160,8 @@ struct UsagePanel: View {
             let alertHeight: CGFloat = (
                 limit.rateLimitReachedType != nil || limit.spendControlReached == true
             ) ? 31 : 0
-            return total + 106 + additionalWindows + alertHeight
+            let chartHeight: CGFloat = limit.windows.contains { $0.windowDurationMins == 7 * 24 * 60 } ? 205 : 0
+            return total + 106 + additionalWindows + alertHeight + chartHeight
         }
         let resetCreditsHeight: CGFloat = 66 + CGFloat(max((snapshot.resetCredits?.credits?.count ?? 1) - 1, 0)) * 18
 
@@ -200,7 +203,7 @@ struct UsagePanel: View {
     private var notificationStatus: some View {
         switch model.notificationsEnabled {
         case true:
-            Label("Alerts at each 10% boundary", systemImage: "bell.fill")
+            Label("Usage alerts and reset notifications", systemImage: "bell.fill")
         case false:
             Label("Notifications disabled", systemImage: "bell.slash")
                 .foregroundStyle(.orange)
@@ -254,6 +257,8 @@ private struct ContentHeightPreferenceKey: PreferenceKey {
 private struct LimitCard: View {
     let limit: UsageLimit
     let paceEstimates: [String: UsagePaceEstimate]
+    let weeklyHistories: [String: [UsageHistorySample]]
+    let observedAt: Date
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -286,6 +291,15 @@ private struct LimitCard: View {
                         Divider()
                     }
                 }
+            }
+
+            ForEach(limit.windows.filter { $0.windowDurationMins == 7 * 24 * 60 }) { window in
+                WeeklyUsageChart(
+                    samples: weeklyHistories[UsagePaceTracker.key(limitID: limit.limitID, window: window)] ?? [],
+                    window: window,
+                    estimate: paceEstimates[UsagePaceTracker.key(limitID: limit.limitID, window: window)],
+                    observedAt: observedAt
+                )
             }
 
             if let reached = limit.rateLimitReachedType {

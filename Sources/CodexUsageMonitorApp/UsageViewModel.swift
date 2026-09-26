@@ -16,6 +16,10 @@ final class UsageViewModel: ObservableObject {
     @Published private(set) var notificationsEnabled: Bool?
     @Published private(set) var paceEstimates: [String: UsagePaceEstimate] = [:]
 
+    @Published private(set) var weeklyHistories: [String: [UsageHistorySample]] = [:]
+
+    private let pollingQueue = DispatchQueue(label: "usage.history-polling", qos: .utility)
+    private let historyTracker = UsageHistoryTracker()
     private var timer: Timer?
     private let refreshInterval: TimeInterval
 
@@ -52,12 +56,17 @@ final class UsageViewModel: ObservableObject {
         }
         guard !isRefreshing else { return }
         state = .loading
-        DispatchQueue.global(qos: .utility).async { [weak self] in
-            let result = Result { try AppServerClient.fetchUsage() }
+        let historyTracker = self.historyTracker
+        pollingQueue.async { [weak self] in
+            let result = Result {
+                let snapshot = try AppServerClient.fetchUsage()
+                return (snapshot, historyTracker.process(snapshot))
+            }
             DispatchQueue.main.async {
                 guard let self else { return }
                 switch result {
-                case .success(let snapshot):
+                case .success(let (snapshot, histories)):
+                    self.weeklyHistories = histories
                     self.paceEstimates = UsagePaceTracker.shared.process(snapshot)
                     self.snapshot = snapshot
                     self.state = .connected

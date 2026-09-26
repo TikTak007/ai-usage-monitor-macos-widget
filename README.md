@@ -213,3 +213,23 @@ macOSアプリは、ChatGPT.appとCodex.appの新しい
 古いMonitorで「Codex was not found」が表示された場合は、最新ソースから
 再ビルドしてください。`CODEX_BIN`で明示する場合は、Monitorを起動する
 プロセスの環境変数として設定する必要があります。
+
+### Weekly history and reset alerts
+
+The macOS monitor records successful observations every three minutes (3,360 per
+seven days), retains seven days locally, and caps each weekly window at 4,096
+normalized samples. It draws at most 600 extrema-preserving points. Earlier
+unrecorded data, failed reads, sleep and shutdown periods are not backfilled.
+The chart uses actual timestamps for the past seven days and extends into the
+future until the returned reset time. Hover over history for an observation's
+time and value. The dashed forecast uses the same exhaustion estimate as the
+summary and appears only when exhaustion is predicted before the next reset.
+Paths separate at changed cycle metadata and observation gaps over five minutes.
+
+Reset alerts use the existing macOS notification permission. The first observation
+sets a baseline. A later observation must advance the authoritative reset timestamp
+and either follow the previous deadline or show a substantial early replenishment
+(at least 20 points recovered and at least 90% remaining). Percentages alone and
+small metadata corrections do not confirm resets. A denied notification permission,
+offline period or delayed/missing provider data can delay or prevent a notice.
+No actual reset is triggered by the monitor.

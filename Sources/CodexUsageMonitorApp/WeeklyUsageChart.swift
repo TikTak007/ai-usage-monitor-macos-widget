@@ -61,7 +61,7 @@ struct WeeklyUsageChart: View {
                 }
                 PointMark(x: .value("Now", observedAt), y: .value("Remaining", window.remainingPercent))
                     .foregroundStyle(.teal).symbolSize(28)
-                    .annotation(position: .top, alignment: .trailing) {
+                    .annotation(position: window.remainingPercent >= 90 ? .bottom : .top, alignment: .leading) {
                         Text("\(window.remainingPercent)%").font(.caption2.weight(.semibold))
                     }
                 if let inspectedSample {

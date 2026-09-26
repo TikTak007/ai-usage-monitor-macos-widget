@@ -39,6 +39,8 @@ cp "$project_dir/macos/Info.plist" "$contents_dir/Info.plist"
 cp "$project_dir/macos/AppIcon.icns" "$contents_dir/Resources/AppIcon.icns"
 rm -rf "$widget_dir"
 /usr/bin/ditto "$widget_product" "$widget_dir"
+mkdir -p "$widget_dir/Contents/Resources"
+cp "$project_dir/macos/AppIcon.icns" "$widget_dir/Contents/Resources/AppIcon.icns"
 
 codesign \
     --force \

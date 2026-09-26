@@ -81,6 +81,13 @@ struct UsageTimelineProvider: TimelineProvider {
 }
 
 @main
+struct UsageWidgets: WidgetBundle {
+    var body: some Widget {
+        CodexUsageWidget()
+        WeeklyGraphWidget()
+    }
+}
+
 struct CodexUsageWidget: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(

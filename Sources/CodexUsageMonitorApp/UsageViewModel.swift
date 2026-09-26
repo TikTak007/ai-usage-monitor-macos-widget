@@ -71,7 +71,7 @@ final class UsageViewModel: ObservableObject {
                     self.snapshot = snapshot
                     self.state = .connected
                     UsageNotificationManager.shared.process(snapshot)
-                    UsageWidgetBridge.publish(snapshot)
+                    UsageWidgetBridge.publish(snapshot, histories: histories, estimates: self.paceEstimates)
                 case .failure(let error):
                     self.state = .failed(
                         (error as? LocalizedError)?.errorDescription
@@ -84,6 +84,6 @@ final class UsageViewModel: ObservableObject {
 
     func publishCurrentSnapshot() {
         guard let snapshot else { return }
-        UsageWidgetBridge.publish(snapshot)
+        UsageWidgetBridge.publish(snapshot, histories: weeklyHistories, estimates: self.paceEstimates)
     }
 }

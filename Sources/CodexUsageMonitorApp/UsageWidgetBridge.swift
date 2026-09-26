@@ -3,7 +3,8 @@ import CodexUsageShared
 import WidgetKit
 
 enum UsageWidgetBridge {
-    static func publish(_ snapshot: UsageSnapshot) {
+    static func publish(_ snapshot: UsageSnapshot, histories: [String: [UsageHistorySample]],
+                        estimates: [String: UsagePaceEstimate]) {
         let shared = WidgetUsageSnapshot(
             limits: snapshot.limits.map { limit in
                 WidgetUsageLimit(
@@ -27,10 +28,27 @@ enum UsageWidgetBridge {
                 )
             },
             appearanceMode: UserDefaults.standard.string(forKey: "appearanceMode"),
-            updatedAt: snapshot.updatedAt
+            updatedAt: snapshot.updatedAt,
+            weeklyGraphs: snapshot.limits.flatMap { limit in
+                limit.windows.filter { $0.windowDurationMins == 7 * 24 * 60 }.map { window in
+                    let key = UsagePaceTracker.key(limitID: limit.limitID, window: window)
+                    let domain = UsageHistory.chartDomain(observedAt: snapshot.updatedAt, resetsAt: window.resetsAt)
+                    let history = (histories[key] ?? []).filter {
+                        domain.contains($0.observedAt) && $0.observedAt <= snapshot.updatedAt
+                    }
+                    return WidgetWeeklyGraph(
+                        id: key, name: limit.displayName, remainingPercent: window.remainingPercent,
+                        resetsAt: window.resetsAt, exhaustionDate: estimates[key]?.exhaustionDate,
+                        points: UsageHistory.drawingSamples(history, maximumPoints: WidgetWeeklyGraph.maximumDrawingPoints)
+                            .map { WidgetHistoryPoint(observedAt: $0.observedAt,
+                                remainingPercent: $0.remainingPercent, segment: $0.segment) }
+                    )
+                }
+            }
         )
 
         WidgetSnapshotServer.shared.publish(shared)
         WidgetCenter.shared.reloadTimelines(ofKind: WidgetUsageConstants.widgetKind)
+        WidgetCenter.shared.reloadTimelines(ofKind: WidgetUsageConstants.graphWidgetKind)
     }
 }

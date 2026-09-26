@@ -32,9 +32,11 @@ xcodebuild \
     build
 
 mkdir -p "$contents_dir/MacOS"
+mkdir -p "$contents_dir/Resources"
 mkdir -p "$contents_dir/PlugIns"
 cp "$executable" "$contents_dir/MacOS/CodexUsageMonitor"
 cp "$project_dir/macos/Info.plist" "$contents_dir/Info.plist"
+cp "$project_dir/macos/AppIcon.icns" "$contents_dir/Resources/AppIcon.icns"
 rm -rf "$widget_dir"
 /usr/bin/ditto "$widget_product" "$widget_dir"
 

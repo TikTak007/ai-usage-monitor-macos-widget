@@ -64,14 +64,51 @@ URLで識別してください。
 - 残量、使用率、リセット時刻、リセットまでのカウントダウンを表示します。
 - 利用可能なすべてのバンクリセットと、判明している各有効期限を表示します。
 - リセットの影響を受けにくい軽量な移動計算で、利用ペースを推定します。
+- 週間の利用枠カードに、過去7日間の残量グラフを表示します。
+- リセット前に使い切る見込みがある場合は、予測時刻と現在値から0%までの破線を表示します。
+- グラフ上にポインタを重ねると、記録した日時と残量を確認できます。
 - WidgetKitによる小・中サイズのデスクトップウィジェットを提供します。
 - 「システム連動」「ライト」「ダーク」の表示モードを選択できます。
 - 3分ごとの自動更新と、手動更新に対応します。
 - 使用率が新たに10%の境界を越えたとき、任意で通知します。
+- 利用枠のリセットを確認したときに通知します。
 - 更新に失敗しても、最後に取得できた正常な情報を表示し続けます。
 
 AI Usage Monitorがバンクリセットを使用したり、利用上限の回避・変更を試みたりする
 ことはありません。
+
+## 7日間の残量グラフと使い切り予測
+
+週間の利用枠カードの下部に、過去7日間の残量をグラフで表示します。
+青緑色の実線と薄い塗りで実際に記録した残量を示し、リセット前に使い切る見込みが
+ある場合は、現在値から残量0%になる予測時刻までをオレンジ色の破線で示します。
+破線はカード内の使い切り予測と同じ推定値を使用します。
+
+データの取得・記録は3分ごとです。連続して取得できれば7日間で3,360点となり、
+各利用枠につき最大4,096点をMac内に保存します。描画時だけ、各区間の最小値・最大値を
+保ちながら最大600点に絞ります。記録前の履歴や、取得失敗・スリープ・終了中の空白は
+埋め合わせません。グラフは利用開始後から徐々に蓄積されます。
+
+横軸は実際の日時を使い、過去7日間から取得元が返した次のリセット時刻までを表示します。
+リセットを曜日や日付の境界に固定しないため、不規則なリセットにも対応します。
+履歴上にポインタを重ねると、記録した日時と残量を確認できます。
+残量が増えた場合、リセット時刻が変わった場合、または記録間隔が5分を超えた場合は、
+線を分けて表示します。
+
+## リセット確認通知
+
+利用枠のリセットが確認できたときに、macOSの通知を送ります。
+初回取得は比較の基準にするため、リセット通知を送りません。
+取得元の次回リセット時刻が以前より60秒を超えて先へ進み、さらに、以前のリセット時刻を
+過ぎているか、早期の大幅な残量回復（20ポイント以上の回復かつ残量90%以上）があることを
+確認して通知します。残量の増加だけや小さな時刻修正では通知しません。
+
+リセット時刻と残量回復が別々の取得で届く場合は、最大15分間の情報を組み合わせて
+判断します。同じリセットの通知は、アプリを再起動しても重複しないよう記録します。
+アプリの稼働中は、通常、次の3分ごとの取得でリセットを確認します。
+通知にはmacOSの通知許可が必要です。アプリの終了、オフライン、取得元の情報の遅れや
+欠落によって、通知が遅れたり届かなかったりする場合があります。
+このアプリがリセットやバンクリセットを実行することはありません。
 
 ## 動作要件
 
@@ -144,7 +181,8 @@ AI Usage Monitorを終了し、`~/Applications/AI Usage Monitor.app`をゴミ箱
 正規化済みスナップショットだけを共有します。アカウント情報、認証情報、
 `app-server`の未加工応答は共有しません。
 
-利用ペースの推定では、利用枠ごとに最大64件の小さなサンプルをローカルのユーザー設定へ
+7日間グラフはメニューバーの週間カードに表示します。
+グラフ用の履歴とは別に、利用ペースの推定では、利用枠ごとに最大64件の小さなサンプルをローカルのユーザー設定へ
 保存します。短時間の移動ペースと、時間で重み付けした長時間のペースを組み合わせます。
 利用枠がリセットされた場合は負のペースを発生させず、単調増加する消費量へ反映します。
 バックエンドによる小さな下方修正は消費として加算しません。十分な履歴がない場合や、
@@ -213,23 +251,3 @@ macOSアプリは、ChatGPT.appとCodex.appの新しい
 古いMonitorで「Codex was not found」が表示された場合は、最新ソースから
 再ビルドしてください。`CODEX_BIN`で明示する場合は、Monitorを起動する
 プロセスの環境変数として設定する必要があります。
-
-### Weekly history and reset alerts
-
-The macOS monitor records successful observations every three minutes (3,360 per
-seven days), retains seven days locally, and caps each weekly window at 4,096
-normalized samples. It draws at most 600 extrema-preserving points. Earlier
-unrecorded data, failed reads, sleep and shutdown periods are not backfilled.
-The chart uses actual timestamps for the past seven days and extends into the
-future until the returned reset time. Hover over history for an observation's
-time and value. The dashed forecast uses the same exhaustion estimate as the
-summary and appears only when exhaustion is predicted before the next reset.
-Paths separate at changed cycle metadata and observation gaps over five minutes.
-
-Reset alerts use the existing macOS notification permission. The first observation
-sets a baseline. A later observation must advance the authoritative reset timestamp
-and either follow the previous deadline or show a substantial early replenishment
-(at least 20 points recovered and at least 90% remaining). Percentages alone and
-small metadata corrections do not confirm resets. A denied notification permission,
-offline period or delayed/missing provider data can delay or prevent a notice.
-No actual reset is triggered by the monitor.

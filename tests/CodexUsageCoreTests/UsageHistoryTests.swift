@@ -81,4 +81,29 @@ final class UsageHistoryTests: XCTestCase {
         XCTAssertEqual(unchanged.map(\.segment), [0, 0, 0])
     }
 
+    func testChartAlwaysShowsOneSevenDayCycleBeforeAndAfterReset() {
+        let nextReset = epoch.addingTimeInterval(UsageHistory.retention)
+        for elapsed: TimeInterval in [0, 180, 3 * 24 * 3600, UsageHistory.retention - 180] {
+            let now = epoch.addingTimeInterval(elapsed)
+            let range = UsageHistory.chartDomain(observedAt: now, resetsAt: nextReset)
+            XCTAssertEqual(range.lowerBound, epoch)
+            XCTAssertEqual(range.upperBound, nextReset)
+            XCTAssertEqual(range.upperBound.timeIntervalSince(range.lowerBound), UsageHistory.retention)
+            XCTAssertTrue(range.contains(now))
+        }
+        let advanced = UsageHistory.chartDomain(observedAt: nextReset.addingTimeInterval(180),
+            resetsAt: nextReset.addingTimeInterval(UsageHistory.retention))
+        XCTAssertEqual(advanced.lowerBound, nextReset)
+        XCTAssertEqual(advanced.upperBound.timeIntervalSince(advanced.lowerBound), UsageHistory.retention)
+    }
+
+    func testUnknownExpiredOrDistantResetFallsBackToSevenDayHistory() {
+        for reset in [nil, epoch.addingTimeInterval(-1), epoch,
+                      epoch.addingTimeInterval(UsageHistory.retention + 180)] {
+            let range = UsageHistory.chartDomain(observedAt: epoch, resetsAt: reset)
+            XCTAssertEqual(range.upperBound, epoch)
+            XCTAssertEqual(range.lowerBound, epoch.addingTimeInterval(-UsageHistory.retention))
+        }
+    }
+
 }

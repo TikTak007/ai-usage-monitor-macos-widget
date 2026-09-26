@@ -9,17 +9,19 @@ struct WeeklyUsageChart: View {
     let observedAt: Date
     @State private var inspectedSample: UsageHistorySample?
 
-    private var start: Date { observedAt.addingTimeInterval(-UsageHistory.retention) }
+    private var domain: ClosedRange<Date> {
+        UsageHistory.chartDomain(observedAt: observedAt, resetsAt: window.resetsAt)
+    }
+    private var start: Date { domain.lowerBound }
+    private var end: Date { domain.upperBound }
+    private var ticks: [Date] {
+        [start, start.addingTimeInterval(2 * 24 * 3600),
+         start.addingTimeInterval(4 * 24 * 3600), end]
+    }
     private var forecast: UsagePaceEstimate? {
         guard let estimate, let reset = window.resetsAt,
-              estimate.exhaustionDate > observedAt, estimate.exhaustionDate < reset else { return nil }
+              estimate.exhaustionDate > observedAt, estimate.exhaustionDate < reset, estimate.exhaustionDate <= end else { return nil }
         return estimate
-    }
-    private var end: Date {
-        if let reset = window.resetsAt, reset > observedAt {
-            return reset
-        }
-        return observedAt
     }
     private var points: [UsageHistorySample] {
         UsageHistory.drawingSamples(samples.filter { $0.observedAt >= start && $0.observedAt <= observedAt })
@@ -29,7 +31,7 @@ struct WeeklyUsageChart: View {
         VStack(alignment: .leading, spacing: 6) {
             Divider()
             HStack {
-                Text("7-day history + forecast").font(.caption.weight(.medium))
+                Text("7-day remaining + forecast").font(.caption.weight(.medium))
                 Spacer(minLength: 4)
                 legend("History", color: .teal, dashed: false)
                 if forecast != nil { legend("Forecast", color: .orange, dashed: true) }
@@ -59,7 +61,7 @@ struct WeeklyUsageChart: View {
                 }
                 PointMark(x: .value("Now", observedAt), y: .value("Remaining", window.remainingPercent))
                     .foregroundStyle(.teal).symbolSize(28)
-                    .annotation(position: .top, alignment: .trailing) {
+                    .annotation(position: window.remainingPercent >= 90 ? .bottom : .top, alignment: .leading) {
                         Text("\(window.remainingPercent)%").font(.caption2.weight(.semibold))
                     }
                 if let inspectedSample {
@@ -67,13 +69,14 @@ struct WeeklyUsageChart: View {
                         .foregroundStyle(.secondary.opacity(0.5))
                 }
             }
-            .chartXScale(domain: start...end)
+            .chartXScale(domain: domain)
             .chartYScale(domain: 0...100)
             .chartLegend(.hidden)
             .chartXAxis {
-                AxisMarks(values: .automatic(desiredCount: 4)) { value in
+                AxisMarks(values: ticks) { value in
                     AxisGridLine().foregroundStyle(.secondary.opacity(0.12))
-                    AxisValueLabel(anchor: .top) {
+                    AxisValueLabel(anchor: value.as(Date.self) == start ? .topLeading :
+                        (value.as(Date.self) == end ? .topTrailing : .top)) {
                         if let date = value.as(Date.self) {
                             Text(date.formatted(.dateTime.month(.twoDigits).day(.twoDigits)))
                         }
@@ -103,7 +106,7 @@ struct WeeklyUsageChart: View {
                                       let time: Date = proxy.value(atX: plotX), time <= observedAt else {
                                     inspectedSample = nil; return
                                 }
-                                inspectedSample = samples.min {
+                                inspectedSample = samples.filter { $0.observedAt >= start && $0.observedAt <= observedAt }.min {
                                     abs($0.observedAt.timeIntervalSince(time)) < abs($1.observedAt.timeIntervalSince(time))
                                 }
                             case .ended: inspectedSample = nil

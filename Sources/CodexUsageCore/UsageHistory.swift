@@ -20,6 +20,19 @@ public enum UsageHistory {
     public static let maximumSamples = 4_096
     public static let maximumConnectedGap: TimeInterval = 5 * 60
 
+    /// Show exactly one weekly period, ending at the authoritative next reset.
+    /// Missing, expired or implausibly distant metadata falls back to seven days of history.
+    public static func chartDomain(observedAt: Date, resetsAt: Date?) -> ClosedRange<Date> {
+        let end: Date
+        if let reset = resetsAt, reset > observedAt,
+           reset.timeIntervalSince(observedAt) <= retention {
+            end = reset
+        } else {
+            end = observedAt
+        }
+        return end.addingTimeInterval(-retention)...end
+    }
+
     public static func recording(
         _ samples: [UsageHistorySample], remainingPercent: Int,
         observedAt: Date, resetsAt: Date?

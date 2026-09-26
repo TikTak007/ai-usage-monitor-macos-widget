@@ -7,16 +7,26 @@ public struct UsageResetCheckpoint: Codable, Equatable, Sendable {
     public let observedAt: TimeInterval
     public let lastNotifiedResetsAt: TimeInterval?
 
+    public let pendingRemainingPercent: Int?
+    public let pendingObservedAt: TimeInterval?
+    public let pendingResetsAt: TimeInterval?
+
     public init(
         remainingPercent: Int,
         resetsAt: TimeInterval?,
         observedAt: TimeInterval,
-        lastNotifiedResetsAt: TimeInterval? = nil
+        lastNotifiedResetsAt: TimeInterval? = nil,
+        pendingRemainingPercent: Int? = nil,
+        pendingObservedAt: TimeInterval? = nil,
+        pendingResetsAt: TimeInterval? = nil
     ) {
         self.remainingPercent = min(max(remainingPercent, 0), 100)
         self.resetsAt = resetsAt.flatMap { $0.isFinite ? $0 : nil }
         self.observedAt = observedAt
         self.lastNotifiedResetsAt = lastNotifiedResetsAt
+        self.pendingRemainingPercent = pendingRemainingPercent
+        self.pendingObservedAt = pendingObservedAt
+        self.pendingResetsAt = pendingResetsAt
     }
 }
 
@@ -52,26 +62,54 @@ public enum UsageResetPolicy {
         } else {
             retainedReset = validReset
         }
+        // Correlate split observations for at most fifteen minutes. An early
+        // metadata revision alone must never become a scheduled reset later.
+        let pendingIsFresh = previous?.pendingObservedAt.map {
+            observed - $0 <= 15 * 60
+        } ?? false
+        let baseline = pendingIsFresh
+            ? (previous?.pendingRemainingPercent ?? remaining)
+            : (previous?.remainingPercent ?? remaining)
+        var pendingRemaining = pendingIsFresh ? previous?.pendingRemainingPercent : nil
+        var pendingObserved = pendingIsFresh ? previous?.pendingObservedAt : nil
+        var pendingReset = pendingIsFresh ? previous?.pendingResetsAt : nil
         var confirmed = false
         if let previous, let oldReset = previous.resetsAt, let newReset = validReset {
             let advancesCycle = newReset > oldReset + resetTimestampTolerance
+            let matchesPending = pendingReset.map {
+                abs(newReset - $0) <= resetTimestampTolerance
+            } ?? false
             let notAlreadyNotified = previous.lastNotifiedResetsAt.map {
                 newReset > $0 + resetTimestampTolerance
             } ?? true
-            let scheduled = observed >= oldReset
             let replenished = remaining >= minimumEarlyRemaining
-                && remaining - previous.remainingPercent >= minimumEarlyRecovery
-            confirmed = advancesCycle && newReset > observed && notAlreadyNotified
-                && (scheduled || replenished)
+                && remaining - baseline >= minimumEarlyRecovery
+            confirmed = newReset > observed && notAlreadyNotified
+                && ((advancesCycle && (observed >= oldReset || replenished))
+                    || (matchesPending && replenished))
+            if advancesCycle && !confirmed {
+                pendingRemaining = baseline
+                pendingObserved = pendingObserved ?? observed
+                pendingReset = newReset
+            }
+        } else if validReset == nil, previous?.resetsAt != nil {
+            pendingRemaining = pendingRemaining ?? previous?.remainingPercent
+            pendingObserved = pendingObserved ?? observed
         }
-
+        if confirmed {
+            pendingRemaining = nil
+            pendingObserved = nil
+            pendingReset = nil
+        }
         return (
             UsageResetCheckpoint(
                 remainingPercent: remaining,
-                // A missing field does not erase previously authoritative cycle metadata.
                 resetsAt: retainedReset,
                 observedAt: observed,
-                lastNotifiedResetsAt: confirmed ? validReset : previous?.lastNotifiedResetsAt
+                lastNotifiedResetsAt: confirmed ? validReset : previous?.lastNotifiedResetsAt,
+                pendingRemainingPercent: pendingRemaining,
+                pendingObservedAt: pendingObserved,
+                pendingResetsAt: pendingReset
             ),
             confirmed
         )

@@ -28,10 +28,12 @@ public enum UsageHistory {
               samples.last.map({ observedAt > $0.observedAt }) ?? true else { return samples }
         var result = samples
         let last = result.last
+        let knownReset = result.last(where: { $0.resetsAt != nil })?.resetsAt
         // A gap or a changed cycle ends the old path; never draw a fabricated recovery.
         let breaksPath = last.map {
             observedAt.timeIntervalSince($0.observedAt) > maximumConnectedGap ||
-                ($0.resetsAt != nil && resetsAt != nil && $0.resetsAt != resetsAt)
+                (knownReset != nil && resetsAt != nil && knownReset != resetsAt) ||
+                remainingPercent > $0.remainingPercent
         } ?? false
         let segment = (last?.segment ?? 0) + (breaksPath ? 1 : 0)
         let sample = UsageHistorySample(observedAt: observedAt, remainingPercent: remainingPercent,

@@ -104,4 +104,31 @@ final class UsageResetPolicyTests: XCTestCase {
         XCTAssertEqual(update(nil, remaining: 120, reset: nil, at: 1_000).checkpoint?.remainingPercent, 100)
         XCTAssertEqual(update(nil, remaining: -5, reset: nil, at: 1_000).checkpoint?.remainingPercent, 0)
     }
+    func testReplenishmentBeforeMetadataIsCorrelated() {
+        let old = update(nil, remaining: 30, reset: 5_000, at: 1_000).checkpoint
+        let missing = update(old, remaining: 100, reset: nil, at: 1_180)
+        XCTAssertFalse(missing.resetConfirmed)
+        let reset = update(missing.checkpoint, remaining: 99, reset: 9_000, at: 1_360)
+        XCTAssertTrue(reset.resetConfirmed)
+        XCTAssertFalse(update(reset.checkpoint, remaining: 99, reset: 9_000, at: 1_540).resetConfirmed)
+    }
+
+    func testMetadataBeforeReplenishmentIsCorrelatedAcrossRestart() throws {
+        let old = update(nil, remaining: 30, reset: 5_000, at: 1_000).checkpoint
+        let revised = update(old, remaining: 30, reset: 9_000, at: 1_180)
+        XCTAssertFalse(revised.resetConfirmed)
+        let restored = try JSONDecoder().decode(UsageResetCheckpoint.self,
+            from: JSONEncoder().encode(XCTUnwrap(revised.checkpoint)))
+        XCTAssertTrue(update(restored, remaining: 100, reset: 9_000, at: 1_360).resetConfirmed)
+    }
+
+    func testPendingMetadataAloneDoesNotConfirmAndEvidenceExpires() {
+        let old = update(nil, remaining: 30, reset: 1_500, at: 1_000).checkpoint
+        let revised = update(old, remaining: 30, reset: 9_000, at: 1_180).checkpoint
+        XCTAssertFalse(update(revised, remaining: 30, reset: 9_000, at: 1_540).resetConfirmed)
+        XCTAssertFalse(update(revised, remaining: 100, reset: 9_000, at: 2_100).resetConfirmed)
+        let missing = update(old, remaining: 100, reset: nil, at: 1_180).checkpoint
+        XCTAssertFalse(update(missing, remaining: 100, reset: 1_500, at: 1_360).resetConfirmed)
+    }
+
 }

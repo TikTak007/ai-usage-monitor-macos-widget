@@ -65,4 +65,20 @@ final class UsageHistoryTests: XCTestCase {
         XCTAssertEqual(samples.count, 3360)
         XCTAssertEqual(drawing, drawing.sorted { $0.observedAt < $1.observedAt })
     }
+    func testMissingCycleMetadataAndRecoveryNeverConnectSeparateCycles() {
+        let reset = epoch.addingTimeInterval(5_000)
+        var history = UsageHistory.recording([], remainingPercent: 30, observedAt: epoch, resetsAt: reset)
+        history = UsageHistory.recording(history, remainingPercent: 100,
+            observedAt: epoch.addingTimeInterval(180), resetsAt: nil)
+        history = UsageHistory.recording(history, remainingPercent: 99,
+            observedAt: epoch.addingTimeInterval(360), resetsAt: reset.addingTimeInterval(4_000))
+        XCTAssertEqual(history.map(\.segment), [0, 1, 2])
+        var unchanged = UsageHistory.recording([], remainingPercent: 30, observedAt: epoch, resetsAt: reset)
+        unchanged = UsageHistory.recording(unchanged, remainingPercent: 30,
+            observedAt: epoch.addingTimeInterval(180), resetsAt: nil)
+        unchanged = UsageHistory.recording(unchanged, remainingPercent: 29,
+            observedAt: epoch.addingTimeInterval(360), resetsAt: reset)
+        XCTAssertEqual(unchanged.map(\.segment), [0, 0, 0])
+    }
+
 }

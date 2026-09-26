@@ -8,6 +8,7 @@ final class UsageNotificationManager: NSObject, UNUserNotificationCenterDelegate
     private let center: UNUserNotificationCenter
     private let defaults: UserDefaults
     private let checkpointsKey = "usageNotificationCheckpoints.v1"
+    private let resetCheckpointsKey = "usageResetNotificationCheckpoints.v1"
 
     init(
         center: UNUserNotificationCenter = .current(),
@@ -44,10 +45,24 @@ final class UsageNotificationManager: NSObject, UNUserNotificationCenterDelegate
         let previous = loadCheckpoints()
         var current: [String: UsageThresholdCheckpoint] = [:]
         var events: [(limit: UsageLimit, window: UsageWindow, threshold: Int)] = []
+        var resetCheckpoints = UsageResetPolicy.prune(
+            loadResetCheckpoints(), observedAt: snapshot.updatedAt
+        )
+        var resetEvents: [(limit: UsageLimit, window: UsageWindow)] = []
 
         for limit in snapshot.limits {
             for window in limit.windows {
                 let key = checkpointKey(limit: limit, window: window)
+                let resetResult = UsageResetPolicy.update(
+                    previous: resetCheckpoints[key],
+                    remainingPercent: window.remainingPercent,
+                    resetsAt: window.resetsAt,
+                    observedAt: snapshot.updatedAt
+                )
+                resetCheckpoints[key] = resetResult.checkpoint
+                if resetResult.resetConfirmed {
+                    resetEvents.append((limit, window))
+                }
                 if let threshold = UsageThresholdPolicy.crossedThreshold(
                     previous: previous[key],
                     remainingPercent: window.remainingPercent,
@@ -63,6 +78,10 @@ final class UsageNotificationManager: NSObject, UNUserNotificationCenterDelegate
         }
 
         saveCheckpoints(current)
+        saveResetCheckpoints(resetCheckpoints)
+        for event in resetEvents {
+            scheduleResetNotification(limit: event.limit, window: event.window)
+        }
         for event in events {
             scheduleNotification(
                 limit: event.limit,
@@ -105,6 +124,34 @@ final class UsageNotificationManager: NSObject, UNUserNotificationCenterDelegate
 
         let request = UNNotificationRequest(
             identifier: "usage-\(limit.limitID)-\(window.source)-\(threshold)-\(UUID().uuidString)",
+            content: content,
+            trigger: nil
+        )
+        center.add(request)
+    }
+
+    private func loadResetCheckpoints() -> [String: UsageResetCheckpoint] {
+        guard let data = defaults.data(forKey: resetCheckpointsKey),
+              let value = try? JSONDecoder().decode(
+                  [String: UsageResetCheckpoint].self, from: data
+              )
+        else { return [:] }
+        return value
+    }
+
+    private func saveResetCheckpoints(_ checkpoints: [String: UsageResetCheckpoint]) {
+        guard let data = try? JSONEncoder().encode(checkpoints) else { return }
+        defaults.set(data, forKey: resetCheckpointsKey)
+    }
+
+    private func scheduleResetNotification(limit: UsageLimit, window: UsageWindow) {
+        let content = UNMutableNotificationContent()
+        content.title = "Codex usage limit has reset"
+        content.body = "\(limit.displayName) / \(window.label): \(window.remainingPercent)% remaining"
+        content.sound = .default
+        let cycle = window.resetsAt?.timeIntervalSince1970 ?? 0
+        let request = UNNotificationRequest(
+            identifier: "usage-reset-\(checkpointKey(limit: limit, window: window))-\(cycle)",
             content: content,
             trigger: nil
         )

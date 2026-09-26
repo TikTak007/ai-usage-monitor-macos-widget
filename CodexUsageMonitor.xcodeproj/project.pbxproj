@@ -10,6 +10,7 @@
 		A10000000000000000000001 /* CodexUsageWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000001 /* CodexUsageWidget.swift */; };
 		A10000000000000000000002 /* WidgetSnapshotStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000002 /* WidgetSnapshotStore.swift */; };
 		A10000000000000000000003 /* AppearanceMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000006 /* AppearanceMode.swift */; };
+		A10000000000000000000009 /* WeeklyGraphWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000009 /* WeeklyGraphWidget.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -19,6 +20,7 @@
 		A20000000000000000000004 /* CodexUsageWidget.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = macos/CodexUsageWidget.entitlements; sourceTree = "<group>"; };
 		A20000000000000000000005 /* CodexUsageWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = CodexUsageWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		A20000000000000000000006 /* AppearanceMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/CodexUsageShared/AppearanceMode.swift; sourceTree = "<group>"; };
+		A20000000000000000000009 /* WeeklyGraphWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/CodexUsageWidget/WeeklyGraphWidget.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -26,6 +28,7 @@
 			isa = PBXGroup;
 			children = (
 				A20000000000000000000001 /* CodexUsageWidget.swift */,
+				A20000000000000000000009 /* WeeklyGraphWidget.swift */,
 				A20000000000000000000002 /* WidgetSnapshotStore.swift */,
 				A20000000000000000000006 /* AppearanceMode.swift */,
 				A20000000000000000000003 /* WidgetInfo.plist */,
@@ -103,6 +106,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A10000000000000000000001 /* CodexUsageWidget.swift in Sources */,
+				A10000000000000000000009 /* WeeklyGraphWidget.swift in Sources */,
 				A10000000000000000000002 /* WidgetSnapshotStore.swift in Sources */,
 				A10000000000000000000003 /* AppearanceMode.swift in Sources */,
 			);

@@ -118,15 +118,6 @@ struct WeeklyUsageChart: View {
             if let inspectedSample {
                 Text("\(Self.timestamp(inspectedSample.observedAt)) · \(inspectedSample.remainingPercent)% remaining")
                     .font(.caption2.monospacedDigit()).foregroundStyle(.secondary)
-            } else {
-                Text("Now \(Self.timestamp(observedAt))").font(.caption2).foregroundStyle(.secondary)
-            }
-            if let forecast {
-                Text("Expected empty \(Self.timestamp(forecast.exhaustionDate))")
-                    .font(.caption2.weight(.medium)).foregroundStyle(.orange)
-            }
-            if let reset = window.resetsAt {
-                Text("Reset \(Self.timestamp(reset))").font(.caption2).foregroundStyle(.secondary)
             }
             if samples.count < 2 {
                 Text("Collecting history. Earlier data is unavailable.")

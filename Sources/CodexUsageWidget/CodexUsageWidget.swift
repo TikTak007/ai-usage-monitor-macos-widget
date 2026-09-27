@@ -292,7 +292,9 @@ struct RemainingRing: View {
         .accessibilityLabel("Remaining \(percent) percent")
     }
 
-    private var color: Color {
+    private var color: Color { Self.color(for: percent) }
+
+    static func color(for percent: Int) -> Color {
         if percent > 50 { return .green }
         if percent > 20 { return .orange }
         return .red

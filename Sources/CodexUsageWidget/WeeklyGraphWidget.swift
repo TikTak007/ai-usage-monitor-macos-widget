@@ -220,7 +220,7 @@ struct WidgetGraphView: View {
             Circle().stroke(.secondary.opacity(0.18), lineWidth: 8)
             Circle()
                 .trim(from: 0, to: CGFloat(normalized) / 100)
-                .stroke(teal, style: StrokeStyle(lineWidth: 8, lineCap: .round))
+                .stroke(RemainingRing.color(for: normalized), style: StrokeStyle(lineWidth: 8, lineCap: .round))
                 .rotationEffect(.degrees(-90))
             Text("\(normalized)%")
                 .font(.system(size: 23, weight: .bold, design: .rounded))

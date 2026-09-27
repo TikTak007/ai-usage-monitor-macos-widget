@@ -5,12 +5,66 @@ AI Usage Monitorは、ローカルにインストールされたCodexの`app-ser
 利用者自身が内容を確認し、自分のMacでビルド、署名、インストールできるよう、
 ソースコードとして公開しています。
 
-<p align="center">
-  <img src="docs/assets/desktop-widget-dark-top-right-1228x896.png" alt="ダークモードのAI Usage Monitorとデスクトップウィジェット" width="49%">
-  <img src="docs/assets/desktop-widget-light-top-right-1228x896.png" alt="ライトモードのAI Usage Monitorとデスクトップウィジェット" width="49%">
-  <br>
-  <sub>ダークモード（左）とライトモード（右）の表示例</sub>
-</p>
+## 画面の紹介
+
+架空データによる表示例です。メニュー画面、円グラフウィジェットの小・中サイズ、
+7日間グラフウィジェットの小・中・大サイズをライト・ダーク両方で紹介します。
+バンクリセットは2件あり、メニューではそれぞれの期限を表示しています。
+
+ライト表示：
+
+![ライト表示のメニューと全ウィジェット](docs/assets/showcase/overview-light.png)
+
+ダーク表示：
+
+![ダーク表示のメニューと全ウィジェット](docs/assets/showcase/overview-dark.png)
+
+<details>
+<summary>各画面の個別画像を表示（ライト／ダーク）</summary>
+
+### メニュー画面
+
+| ライト | ダーク |
+| --- | --- |
+| ![メニュー画面・ライト](docs/assets/showcase/menu-light.png) | ![メニュー画面・ダーク](docs/assets/showcase/menu-dark.png) |
+
+### 小サイズ：円グラフ
+
+| ライト | ダーク |
+| --- | --- |
+| ![小サイズ：円グラフ・ライト](docs/assets/showcase/circle-small-light.png) | ![小サイズ：円グラフ・ダーク](docs/assets/showcase/circle-small-dark.png) |
+
+### 中サイズ：円グラフ
+
+| ライト | ダーク |
+| --- | --- |
+| ![中サイズ：円グラフ・ライト](docs/assets/showcase/circle-medium-light.png) | ![中サイズ：円グラフ・ダーク](docs/assets/showcase/circle-medium-dark.png) |
+
+### 小サイズ：7日間グラフ
+
+| ライト | ダーク |
+| --- | --- |
+| ![小サイズ：7日間グラフ・ライト](docs/assets/showcase/graph-small-light.png) | ![小サイズ：7日間グラフ・ダーク](docs/assets/showcase/graph-small-dark.png) |
+
+### 中サイズ：7日間グラフ
+
+| ライト | ダーク |
+| --- | --- |
+| ![中サイズ：7日間グラフ・ライト](docs/assets/showcase/graph-medium-light.png) | ![中サイズ：7日間グラフ・ダーク](docs/assets/showcase/graph-medium-dark.png) |
+
+### 大サイズ：円グラフと7日間グラフ
+
+| ライト | ダーク |
+| --- | --- |
+| ![大サイズ：円グラフと7日間グラフ・ライト](docs/assets/showcase/graph-large-light.png) | ![大サイズ：円グラフと7日間グラフ・ダーク](docs/assets/showcase/graph-large-dark.png) |
+
+</details>
+
+画像は製品のSwiftUI実装を、架空データを注入した独立プレビューでネイティブ描画したものです。
+実際のアカウント情報やデスクトップのキャプチャは含みません。
+大サイズの円グラフも、小・中サイズと同じ残量の色分け（50%超は緑、20%超～50%はオレンジ、20%以下は赤）を使います。
+
+
 
 ## Codexでインストール（推奨）
 

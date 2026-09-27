@@ -87,6 +87,7 @@ private struct WeeklyGraphWidgetRoot: View {
 
 /// Kept independent of widget environment values for native snapshot rendering.
 struct WidgetGraphView: View {
+    @Environment(\.colorScheme) private var colorScheme
     let snapshot: WidgetUsageSnapshot?
     let family: WidgetFamily
 
@@ -255,10 +256,6 @@ struct WidgetGraphView: View {
         let points = displayedPoints(graph, observedAt: observedAt)
         let forecast = forecastDate(graph, observedAt: observedAt)
         let remaining = min(max(graph.remainingPercent, 0), 100)
-        let currentFraction = observedAt.timeIntervalSince(domain.lowerBound)
-            / domain.upperBound.timeIntervalSince(domain.lowerBound)
-        let labelAlignment: Alignment = currentFraction > 0.85 ? .trailing
-            : currentFraction < 0.15 ? .leading : .center
         let tickCount = isSmall ? 2 : 4
         let ticks = (0..<tickCount).map { index in
             domain.lowerBound.addingTimeInterval(
@@ -311,16 +308,7 @@ struct WidgetGraphView: View {
             PointMark(x: .value("Time", observedAt), y: .value("Remaining", remaining))
                 .foregroundStyle(teal)
                 .symbolSize(isSmall ? 40 : 55)
-                .annotation(
-                    position: remaining >= 90 ? .bottom : .top,
-                    alignment: labelAlignment,
-                    spacing: 5
-                ) {
-                    Text(isLarge ? "Now" : "\(remaining)%")
-                        .font(isLarge ? .caption : .system(size: isSmall ? 13 : 16, weight: .bold))
-                        .foregroundStyle(isLarge ? Color.secondary : Color.primary)
-                        .padding(.horizontal, 2)
-                }
+
         }
         .chartXScale(domain: domain)
         .chartYScale(domain: 0...100)
@@ -356,7 +344,62 @@ struct WidgetGraphView: View {
         .chartPlotStyle { plot in
             plot.padding(.top, 4).padding(.bottom, 3)
         }
+        .chartOverlay { proxy in
+            GeometryReader { geometry in
+                let frame: CGRect = {
+                    if #available(macOS 14, *), let anchor = proxy.plotFrame { return geometry[anchor] }
+                    return geometry[proxy.plotAreaFrame]
+                }()
+                if let x = proxy.position(forX: observedAt),
+                   let y = proxy.position(forY: remaining) {
+                    let label = isLarge ? "Now" : "\(remaining)%"
+                    let font = NSFont.systemFont(ofSize: isLarge ? 10 : (isSmall ? 13 : 16),
+                                                 weight: isLarge ? .regular : .bold)
+                    let measured = (label as NSString).size(withAttributes: [.font: font])
+                    let size = CGSize(width: ceil(measured.width) + 8,
+                                      height: ceil(font.ascender - font.descender) + 4)
+                    let segments = labelObstacles(points, forecast: forecast, observedAt: observedAt,
+                                                  remaining: remaining, proxy: proxy)
+                    let placement = GraphLabelPlacement.rect(
+                        point: CGPoint(x: x, y: y), label: size, plot: frame.size, segments: segments)
+                    let needsBacking = segments.contains {
+                        GraphLabelPlacement.intersects($0.0, $0.1, placement.insetBy(dx: -3, dy: -3))
+                    }
+                    Text(label)
+                        .font(Font(font))
+                        .foregroundStyle(isLarge ? Color.secondary : Color.primary)
+                        .frame(width: size.width, height: size.height)
+                        .background(labelBackground.opacity(needsBacking ? 0.94 : 0), in: RoundedRectangle(cornerRadius: 4))
+                        .position(x: frame.minX + placement.midX, y: frame.minY + placement.midY)
+                        .accessibilityHidden(true)
+                }
+            }
+            .allowsHitTesting(false)
+        }
         .accessibilityLabel("Seven-day remaining history, now \(remaining) percent")
+    }
+
+    private var labelBackground: Color {
+        colorScheme == .dark ? Color(red: 0.12, green: 0.13, blue: 0.15) : .white
+    }
+
+    private func labelObstacles(
+        _ points: [WidgetHistoryPoint], forecast: Date?, observedAt: Date,
+        remaining: Int, proxy: ChartProxy
+    ) -> [(CGPoint, CGPoint)] {
+        func position(_ date: Date, _ value: Int) -> CGPoint? {
+            guard let x = proxy.position(forX: date), let y = proxy.position(forY: value) else { return nil }
+            return CGPoint(x: x, y: y)
+        }
+        var segments: [(CGPoint, CGPoint)] = []
+        for (a, b) in zip(points, points.dropFirst()) where a.segment == b.segment {
+            if let start = position(a.observedAt, a.remainingPercent),
+               let end = position(b.observedAt, b.remainingPercent) { segments.append((start, end)) }
+        }
+        if let forecast, let start = position(observedAt, remaining), let end = position(forecast, 0) {
+            segments.append((start, end))
+        }
+        return segments
     }
 
     private func displayedPoints(
@@ -376,4 +419,64 @@ struct WidgetGraphView: View {
         return graph.forecastDate(observedAt: observedAt)
     }
 
+}
+
+/// Place the measured label inside the plot, away from the point and actual/forecast lines.
+/// A compact backing keeps it readable if a dense history leaves no fully clear candidate.
+enum GraphLabelPlacement {
+    static func rect(point: CGPoint, label: CGSize, plot: CGSize,
+                     segments: [(CGPoint, CGPoint)]) -> CGRect {
+        let bounds = CGRect(origin: .zero, size: plot).insetBy(dx: 2, dy: 2)
+        let gap: CGFloat = 9
+        let centered = point.x - label.width / 2
+        let xs = [centered, point.x + gap, point.x - gap - label.width]
+        let ys = [point.y - gap - label.height, point.y + gap]
+        var candidates = ys.flatMap { y in xs.map { x in
+            CGRect(x: min(max(x, bounds.minX), max(bounds.minX, bounds.maxX - label.width)),
+                   y: min(max(y, bounds.minY), max(bounds.minY, bounds.maxY - label.height)),
+                   width: label.width, height: label.height)
+        } }
+        // Side positions remain usable when the plot is too short for above/below.
+        for x in xs.dropFirst() {
+            candidates.append(CGRect(x: min(max(x, bounds.minX), max(bounds.minX, bounds.maxX - label.width)),
+                y: min(max(point.y - label.height / 2, bounds.minY), max(bounds.minY, bounds.maxY - label.height)),
+                width: label.width, height: label.height))
+        }
+        // Broaden the search in short plots, where clamping near-point candidates can
+        // place them back across a steep history or forecast line.
+        for row in 0...8 {
+            for column in 0...8 {
+                let x = bounds.minX + max(0, bounds.width - label.width) * CGFloat(column) / 8
+                let y = bounds.minY + max(0, bounds.height - label.height) * CGFloat(row) / 8
+                candidates.append(CGRect(origin: CGPoint(x: x, y: y), size: label))
+            }
+        }
+        let pointArea = CGRect(x: point.x - 5, y: point.y - 5, width: 10, height: 10)
+        func score(_ rect: CGRect) -> CGFloat {
+            let near = rect.insetBy(dx: -3, dy: -3)
+            let collisions = segments.filter { intersects($0.0, $0.1, near) }.count
+            let distance = hypot(rect.midX - point.x, rect.midY - point.y)
+            return CGFloat(collisions) * 1000 + (rect.intersects(pointArea) ? 10000 : 0) + distance
+        }
+        return candidates.enumerated().min {
+            let a = score($0.element), b = score($1.element)
+            return a == b ? $0.offset < $1.offset : a < b
+        }!.element
+    }
+
+    static func intersects(_ a: CGPoint, _ b: CGPoint, _ rect: CGRect) -> Bool {
+        // Liang–Barsky clipping also covers vertical/horizontal and zero-length segments.
+        var lower: CGFloat = 0, upper: CGFloat = 1
+        let dx = b.x - a.x, dy = b.y - a.y
+        for (p, q) in [(-dx, a.x - rect.minX), (dx, rect.maxX - a.x),
+                       (-dy, a.y - rect.minY), (dy, rect.maxY - a.y)] {
+            if p == 0 { if q < 0 { return false } }
+            else {
+                let ratio = q / p
+                if p < 0 { lower = max(lower, ratio) } else { upper = min(upper, ratio) }
+                if lower > upper { return false }
+            }
+        }
+        return true
+    }
 }

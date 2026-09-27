@@ -1,3 +1,4 @@
+import AppKit
 import Charts
 import SwiftUI
 import WidgetKit
@@ -58,8 +59,8 @@ struct WeeklyGraphWidget: Widget {
         ) { entry in
             WeeklyGraphWidgetRoot(entry: entry)
         }
-        .configurationDisplayName("7日間の残量グラフ")
-        .description("Codexの残量と7日間の推移、使い切り予測を表示します。")
+        .configurationDisplayName("7-day Remaining Graph")
+        .description("Shows Codex remaining usage, seven-day history, and estimated exhaustion.")
         .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
     }
 }
@@ -75,6 +76,7 @@ private struct WeeklyGraphWidgetRoot: View {
                     .containerBackground(.fill.tertiary, for: .widget)
             } else {
                 WidgetGraphView(snapshot: entry.snapshot, family: family)
+                    .padding(16)
                     .background(.background)
             }
         }
@@ -98,54 +100,119 @@ struct WidgetGraphView: View {
                 graphContent(graph, observedAt: snapshot.updatedAt)
             } else {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("7日間の残量グラフ")
+                    Text("7-day Remaining Graph")
                         .font(.headline)
                     Spacer(minLength: 0)
                     Text(snapshot?.weeklyGraphs?.isEmpty == true
-                         ? "週間の利用枠がありません" : "アプリを開いて更新してください")
+                         ? "No weekly usage window" : "Open the app to refresh")
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                    Text("履歴は次の更新から表示されます")
+                    Text("History starts with the next update")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                     Spacer(minLength: 0)
                 }
             }
         }
-        .padding(isSmall ? 10 : 14)
     }
 
     private func graphContent(_ graph: WidgetWeeklyGraph, observedAt: Date) -> some View {
-        VStack(alignment: .leading, spacing: isSmall ? 5 : 8) {
-            HStack(alignment: .firstTextBaseline, spacing: 4) {
-                Text(graph.name)
-                    .font(isSmall ? .subheadline.weight(.bold) : .headline)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.75)
-                if isSmall {
-                    Spacer(minLength: 4)
-                    Text(observedAt, format: .dateTime.hour().minute())
-                        .font(.system(size: 8)).foregroundStyle(.secondary)
-                }
-                if !isSmall {
-                    Spacer(minLength: 4)
-                    resetLabel(graph, observedAt: observedAt)
-                }
-            }
+        VStack(alignment: .leading, spacing: isSmall ? 5 : 7) {
             if isLarge {
-                HStack(alignment: .bottom) {
+                HStack(alignment: .center, spacing: 22) {
+                    VStack(alignment: .leading, spacing: 7) {
+                        brand(graph.name)
+                        Text("Reset \(stamp(graph.resetsAt))").foregroundStyle(.secondary)
+                        if let empty = forecastDate(graph, observedAt: observedAt) {
+                            Text("Est. empty \(stamp(empty))").foregroundStyle(.orange)
+                        }
+                        Text("Updated \(time(observedAt)) \(timeZone(observedAt))").foregroundStyle(.secondary)
+                    }.font(.system(size: 11)).lineLimit(1).minimumScaleFactor(0.85)
+                    Spacer(minLength: 0)
                     remainingRing(graph.remainingPercent)
+                }.frame(height: 94)
+                HStack {
                     Spacer()
                     legend(hasForecast: forecastDate(graph, observedAt: observedAt) != nil)
+                }.padding(.top, 15)
+            } else if isSmall {
+                HStack {
+                    brand(graph.name)
+                    Spacer(minLength: 0)
+                    Text("\(time(observedAt)) \(timeZone(observedAt))").font(.system(size: 8)).foregroundStyle(.secondary)
                 }
-                .padding(.bottom, 2)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Reset \(stamp(graph.resetsAt))").foregroundStyle(.secondary)
+                    if let empty = forecastDate(graph, observedAt: observedAt) {
+                        Text("Est. empty \(stamp(empty))").foregroundStyle(.orange)
+                    }
+                }.font(.system(size: 9)).lineLimit(1).minimumScaleFactor(0.85)
+            } else {
+                HStack(alignment: .top, spacing: 8) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        brand(graph.name)
+                        Text("Updated \(time(observedAt)) \(timeZone(observedAt))")
+                            .font(.system(size: 9)).foregroundStyle(.secondary)
+                    }
+                    Spacer(minLength: 0)
+                    VStack(alignment: .trailing, spacing: 4) {
+                        Text("Reset \(stamp(graph.resetsAt))").foregroundStyle(.secondary)
+                        if let empty = forecastDate(graph, observedAt: observedAt) {
+                            Text("Est. empty \(stamp(empty))").foregroundStyle(.orange)
+                        }
+                    }.font(.system(size: 10)).lineLimit(1).minimumScaleFactor(0.85)
+                }
             }
             graphChart(graph, observedAt: observedAt)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-            footer(graph, observedAt: observedAt)
         }
         .accessibilityElement(children: .combine)
     }
+
+    private func brand(_ name: String) -> some View {
+        HStack(spacing: 5) {
+            if let url = Bundle.main.url(forResource: "AppIcon", withExtension: "icns"),
+               let image = NSImage(contentsOf: url) {
+                Image(nsImage: image).resizable()
+                    .frame(width: isSmall ? 16 : 19, height: isSmall ? 16 : 19)
+            } else {
+                Image(systemName: "chevron.left.forwardslash.chevron.right")
+                    .foregroundStyle(teal)
+                    .frame(width: isSmall ? 16 : 19, height: isSmall ? 16 : 19)
+            }
+            Text(name).font(.system(size: isSmall ? 12 : 14, weight: .bold))
+                .lineLimit(1)
+        }
+    }
+
+    private func stamp(_ date: Date?) -> String {
+        guard let date else { return "Unavailable" }
+        return Self.dateFormatter.string(from: date)
+    }
+
+    private func time(_ date: Date) -> String {
+        Self.timeFormatter.string(from: date)
+    }
+
+    private func timeZone(_ date: Date) -> String {
+        TimeZone.current.abbreviation(for: date) ?? TimeZone.current.identifier
+    }
+
+    private static let dateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = .current
+        formatter.dateFormat = "MMM d, HH:mm"
+        return formatter
+    }()
+
+    private static let timeFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = .current
+        formatter.dateFormat = "HH:mm"
+        return formatter
+    }()
 
     private func remainingRing(_ percent: Int) -> some View {
         let normalized = min(max(percent, 0), 100)
@@ -160,14 +227,14 @@ struct WidgetGraphView: View {
         }
         .frame(width: 78, height: 78)
         .padding(4)
-        .accessibilityLabel("残量 \(normalized)パーセント")
+        .accessibilityLabel("\(normalized) percent remaining")
     }
 
     private func legend(hasForecast: Bool) -> some View {
         HStack(spacing: 10) {
             HStack(spacing: 4) {
                 Rectangle().fill(teal).frame(width: 16, height: 2)
-                Text("実績")
+                Text("History")
             }
             if hasForecast {
                 HStack(spacing: 4) {
@@ -175,7 +242,7 @@ struct WidgetGraphView: View {
                         Rectangle().fill(.orange).frame(width: 6, height: 2)
                         Rectangle().fill(.orange).frame(width: 6, height: 2)
                     }
-                    Text("予測")
+                    Text("Forecast")
                 }
             }
         }
@@ -203,45 +270,45 @@ struct WidgetGraphView: View {
         return Chart {
             ForEach(points) { point in
                 AreaMark(
-                    x: .value("日時", point.observedAt),
-                    yStart: .value("下限", 0),
-                    yEnd: .value("残量", point.remainingPercent),
-                    series: .value("区間", "actual-\(point.segment)")
+                    x: .value("Time", point.observedAt),
+                    yStart: .value("Minimum", 0),
+                    yEnd: .value("Remaining", point.remainingPercent),
+                    series: .value("Segment", "actual-\(point.segment)")
                 )
                 .foregroundStyle(teal.opacity(0.15))
                 .interpolationMethod(.linear)
                 LineMark(
-                    x: .value("日時", point.observedAt),
-                    y: .value("残量", point.remainingPercent),
-                    series: .value("区間", "actual-\(point.segment)")
+                    x: .value("Time", point.observedAt),
+                    y: .value("Remaining", point.remainingPercent),
+                    series: .value("Segment", "actual-\(point.segment)")
                 )
                 .foregroundStyle(teal)
                 .lineStyle(StrokeStyle(lineWidth: 2))
                 .interpolationMethod(.linear)
             }
-            RuleMark(x: .value("現在", observedAt))
+            RuleMark(x: .value("Now", observedAt))
                 .foregroundStyle(.secondary.opacity(0.22))
                 .lineStyle(StrokeStyle(lineWidth: 1, dash: [3, 3]))
             if let forecast {
                 LineMark(
-                    x: .value("日時", observedAt),
-                    y: .value("残量", remaining),
-                    series: .value("区間", "forecast")
+                    x: .value("Time", observedAt),
+                    y: .value("Remaining", remaining),
+                    series: .value("Segment", "forecast")
                 )
                 .foregroundStyle(.orange)
                 .lineStyle(StrokeStyle(lineWidth: 2, dash: [5, 4]))
                 LineMark(
-                    x: .value("日時", forecast),
-                    y: .value("残量", 0),
-                    series: .value("区間", "forecast")
+                    x: .value("Time", forecast),
+                    y: .value("Remaining", 0),
+                    series: .value("Segment", "forecast")
                 )
                 .foregroundStyle(.orange)
                 .lineStyle(StrokeStyle(lineWidth: 2, dash: [5, 4]))
-                PointMark(x: .value("日時", forecast), y: .value("残量", 0))
+                PointMark(x: .value("Time", forecast), y: .value("Remaining", 0))
                     .foregroundStyle(.orange)
                     .symbolSize(isSmall ? 24 : 34)
             }
-            PointMark(x: .value("日時", observedAt), y: .value("残量", remaining))
+            PointMark(x: .value("Time", observedAt), y: .value("Remaining", remaining))
                 .foregroundStyle(teal)
                 .symbolSize(isSmall ? 40 : 55)
                 .annotation(
@@ -249,7 +316,7 @@ struct WidgetGraphView: View {
                     alignment: labelAlignment,
                     spacing: 5
                 ) {
-                    Text(isLarge ? "現在" : "\(remaining)%")
+                    Text(isLarge ? "Now" : "\(remaining)%")
                         .font(isLarge ? .caption : .system(size: isSmall ? 13 : 16, weight: .bold))
                         .foregroundStyle(isLarge ? Color.secondary : Color.primary)
                         .padding(.horizontal, 2)
@@ -268,7 +335,7 @@ struct WidgetGraphView: View {
                 AxisValueLabel(anchor: value.as(Date.self) == domain.lowerBound ? .topLeading :
                     (value.as(Date.self) == domain.upperBound ? .topTrailing : .top)) {
                     if let date = value.as(Date.self) {
-                        Text(date, format: .dateTime.month(.twoDigits).day(.twoDigits))
+                        Text(date, format: .dateTime.month(.twoDigits).day(.twoDigits).locale(Locale(identifier: "en_US")))
                             .font(.system(size: isSmall ? 8 : 9))
                     }
                 }
@@ -289,7 +356,7 @@ struct WidgetGraphView: View {
         .chartPlotStyle { plot in
             plot.padding(.top, 4).padding(.bottom, 3)
         }
-        .accessibilityLabel("7日間の残量推移、現在 \(remaining)パーセント")
+        .accessibilityLabel("Seven-day remaining history, now \(remaining) percent")
     }
 
     private func displayedPoints(
@@ -309,48 +376,4 @@ struct WidgetGraphView: View {
         return graph.forecastDate(observedAt: observedAt)
     }
 
-    private func resetLabel(_ graph: WidgetWeeklyGraph, observedAt: Date) -> some View {
-        Group {
-            if let reset = graph.resetsAt, reset > observedAt {
-                Text("リセット \(shortDate(reset))")
-            } else {
-                Text("7日間")
-            }
-        }
-        .font(.caption2)
-        .foregroundStyle(.secondary)
-        .lineLimit(1)
-    }
-
-    private func footer(_ graph: WidgetWeeklyGraph, observedAt: Date) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
-            if isSmall {
-                resetLabel(graph, observedAt: observedAt)
-            }
-            HStack(alignment: .firstTextBaseline, spacing: 4) {
-                if let estimate = forecastDate(graph, observedAt: observedAt) {
-                    Text("使い切り予測 \(shortDate(estimate))")
-                        .foregroundStyle(.orange)
-                } else if graph.points.isEmpty {
-                    Text("履歴を記録中")
-                        .foregroundStyle(.secondary)
-                } else if isLarge {
-                    Text("使い切り予測なし")
-                        .foregroundStyle(.secondary)
-                }
-                if !isSmall {
-                    Spacer(minLength: 4)
-                    Text("更新 \(observedAt.formatted(.dateTime.hour().minute()))")
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .font(.system(size: isSmall ? 8 : 10))
-            .lineLimit(1)
-            .minimumScaleFactor(0.8)
-        }
-    }
-
-    private func shortDate(_ date: Date) -> String {
-        date.formatted(.dateTime.month(.twoDigits).day(.twoDigits))
-    }
 }

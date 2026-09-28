@@ -13,20 +13,28 @@ import SwiftUI
   let sizing = PanelSizingView()
   sizing.requestedHeight=520
   window.contentView?.addSubview(sizing)
+  for _ in 0..<10 { RunLoop.main.run(until:Date().addingTimeInterval(0.02)) }
+  precondition(abs(window.contentLayoutRect.height-520)<1,"initial hidden window mismatch")
+  let top=window.frame.maxY
   window.orderFront(nil)
   for _ in 0..<10 { RunLoop.main.run(until:Date().addingTimeInterval(0.02)) }
-  precondition(abs(window.contentLayoutRect.height-520)<1,"initial window mismatch")
-  let top=window.frame.maxY
+  precondition(window.isVisible,"window did not open")
   sizing.requestedHeight=310
   for _ in 0..<10 { RunLoop.main.run(until:Date().addingTimeInterval(0.02)) }
   precondition(abs(window.contentLayoutRect.height-310)<1,"window did not shrink")
   precondition(abs(window.frame.maxY-top)<1,"top edge moved")
+  window.orderOut(nil)
   sizing.requestedHeight=600
   for _ in 0..<10 { RunLoop.main.run(until:Date().addingTimeInterval(0.02)) }
-  precondition(abs(window.contentLayoutRect.height-600)<1,"window did not grow")
-  precondition(abs(window.frame.maxY-top)<1,"top edge moved after growth")
+  precondition(!window.isVisible,"window unexpectedly visible")
+  precondition(abs(window.contentLayoutRect.height-600)<1,"hidden window did not grow")
+  precondition(abs(window.frame.maxY-top)<1,"top edge moved while hidden")
+  window.orderFront(nil)
+  for _ in 0..<10 { RunLoop.main.run(until:Date().addingTimeInterval(0.02)) }
+  precondition(abs(window.contentLayoutRect.height-600)<1,"reopened window mismatch")
+  precondition(abs(window.frame.maxY-top)<1,"top edge moved after reopen")
   window.close()
-  print("Panel window fit: 680→520→310→600 pt, fixed top edge; PASS")
+  print("Panel window fit: hidden 680→520→310→hidden 600→reopen, fixed top edge; PASS")
  }
 }
 '''

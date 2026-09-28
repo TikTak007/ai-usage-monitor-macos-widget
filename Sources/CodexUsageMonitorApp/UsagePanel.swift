@@ -275,7 +275,7 @@ private final class PanelSizingView: NSView {
     private func scheduleResize() {
         // AppKit must resize after SwiftUI finishes this layout pass.
         DispatchQueue.main.async { [weak self] in
-            guard let self, let window = self.window, window.isVisible,
+            guard let self, let window = self.window,
                   self.requestedHeight > 0 else { return }
             let current = window.contentLayoutRect.height
             guard abs(current - self.requestedHeight) > 1 else { return }

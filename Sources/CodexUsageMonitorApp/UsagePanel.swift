@@ -26,6 +26,7 @@ struct UsagePanel: View {
         }
         .frame(width: 360, height: panelHeight)
         .background(.regularMaterial)
+        .background(PanelWindowSize(height: panelHeight))
         .background(PanelWindowAppearance(mode: appearanceMode))
         .preferredColorScheme(appearanceMode.colorScheme)
         .onPreferenceChange(ContentHeightPreferenceKey.self) { height in
@@ -35,7 +36,6 @@ struct UsagePanel: View {
         .onChange(of: appearanceRawValue) { _ in
             model.publishCurrentSnapshot()
         }
-        .animation(.easeInOut(duration: 0.16), value: panelHeight)
     }
 
     private var header: some View {
@@ -243,6 +243,49 @@ private final class PanelAppearanceView: NSView {
 
     private func applyAppearance() {
         window?.appearance = mode.nsAppearance
+    }
+}
+
+/// MenuBarExtra can retain its former window size when this panel becomes shorter.
+/// Keep the hosted window's content rect equal to the actual SwiftUI panel height.
+private struct PanelWindowSize: NSViewRepresentable {
+    let height: CGFloat
+
+    func makeNSView(context: Context) -> PanelSizingView {
+        let view = PanelSizingView()
+        view.requestedHeight = height
+        return view
+    }
+
+    func updateNSView(_ view: PanelSizingView, context: Context) {
+        view.requestedHeight = height
+    }
+}
+
+private final class PanelSizingView: NSView {
+    var requestedHeight: CGFloat = 0 {
+        didSet { scheduleResize() }
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        scheduleResize()
+    }
+
+    private func scheduleResize() {
+        // AppKit must resize after SwiftUI finishes this layout pass.
+        DispatchQueue.main.async { [weak self] in
+            guard let self, let window = self.window, window.isVisible,
+                  self.requestedHeight > 0 else { return }
+            let current = window.contentLayoutRect.height
+            guard abs(current - self.requestedHeight) > 1 else { return }
+            let top = window.frame.maxY
+            let left = window.frame.minX
+            window.setContentSize(NSSize(width: 360, height: self.requestedHeight))
+            var frame = window.frame
+            frame.origin = NSPoint(x: left, y: top - frame.height)
+            window.setFrame(frame, display: true)
+        }
     }
 }
 

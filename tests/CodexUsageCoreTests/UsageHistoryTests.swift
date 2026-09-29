@@ -234,4 +234,47 @@ final class UsageHistoryTests: XCTestCase {
         XCTAssertEqual(points.last?.observedAt, samples.last?.observedAt)
     }
 
+    func testOneSecondResetVariationPreservesHistoryShapeAtMenuAndWidgetBudgets() throws {
+        let reset = epoch.addingTimeInterval(UsageHistory.retention)
+        let baseline = (1...1100).map { index in
+            UsageHistorySample(observedAt: epoch.addingTimeInterval(Double(index * 180)),
+                remainingPercent: 100 - (index / 27), resetsAt: reset)
+        }
+        let varied = baseline.enumerated().map { index, sample in
+            UsageHistorySample(observedAt: sample.observedAt,
+                remainingPercent: sample.remainingPercent,
+                resetsAt: reset.addingTimeInterval(Double(index % 3 - 1)), segment: index)
+        }
+        let before = try JSONEncoder().encode(varied)
+        for budget in [200, 600, 2000] {
+            let expected = UsageHistory.chartPoints(baseline,
+                remainingPercent: baseline.last!.remainingPercent,
+                observedAt: baseline.last!.observedAt, resetsAt: reset, maximumPoints: budget)
+            let actual = UsageHistory.chartPoints(varied,
+                remainingPercent: varied.last!.remainingPercent,
+                observedAt: varied.last!.observedAt, resetsAt: reset, maximumPoints: budget)
+            XCTAssertEqual(actual, expected, "Metadata variation must not erase points or create gaps")
+            if budget == 2000 { XCTAssertEqual(actual.count, baseline.count + 1) }
+        }
+        XCTAssertEqual(try JSONDecoder().decode([UsageHistorySample].self, from: before), varied)
+    }
+
+    func testResetToleranceIsBoundedAndStillExcludesPreviousPeriods() {
+        let reset = epoch.addingTimeInterval(UsageHistory.retention)
+        let history = [
+            UsageHistorySample(observedAt: epoch.addingTimeInterval(-1), remainingPercent: 5, resetsAt: reset),
+            UsageHistorySample(observedAt: epoch.addingTimeInterval(180), remainingPercent: 10,
+                resetsAt: reset.addingTimeInterval(-2)),
+            UsageHistorySample(observedAt: epoch.addingTimeInterval(360), remainingPercent: 20,
+                resetsAt: reset.addingTimeInterval(2)),
+            UsageHistorySample(observedAt: epoch.addingTimeInterval(540), remainingPercent: 90,
+                resetsAt: reset.addingTimeInterval(1)),
+            UsageHistorySample(observedAt: epoch.addingTimeInterval(720), remainingPercent: 89, resetsAt: nil)
+        ]
+        let points = UsageHistory.chartPoints(history, remainingPercent: 89,
+            observedAt: history.last!.observedAt, resetsAt: reset)
+        XCTAssertEqual(points.map(\.remainingPercent), [100, 90, 89])
+        XCTAssertEqual(points.map(\.lightFromPrevious), [false, true, false])
+    }
+
 }

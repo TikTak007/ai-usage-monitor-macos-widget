@@ -117,7 +117,12 @@ public enum UsageHistory {
         var knownCycle: Date?
         var source = ordered.filter { sample in
             if let reset = sample.resetsAt { knownCycle = reset }
-            return resetsAt == nil || knownCycle == resetsAt
+            guard let resetsAt else { return true }
+            guard let knownCycle else { return false }
+            // Reset metadata can vary by one second within the same weekly period.
+            // Compare to the current reset directly (never accumulate tolerances),
+            // while the domain above still excludes observations before its start.
+            return abs(knownCycle.timeIntervalSince(resetsAt)) <= 1
         }
         if source.last?.observedAt == observedAt {
             source[source.count - 1] = UsageHistorySample(

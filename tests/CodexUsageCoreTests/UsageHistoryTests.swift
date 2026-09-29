@@ -217,4 +217,21 @@ final class UsageHistoryTests: XCTestCase {
         XCTAssertEqual(points.map(\.remainingPercent), [100, 90])
     }
 
+    func testOverfullGapBoundariesStillRetainLateExtrema() {
+        let reset = epoch.addingTimeInterval(UsageHistory.retention)
+        var samples: [UsageHistorySample] = []
+        for index in 1..<200 where index % 4 != 0 {
+            let value = index == 170 ? 0 : (index == 181 ? 100 : 50)
+            samples.append(UsageHistorySample(
+                observedAt: epoch.addingTimeInterval(Double(index * 180)),
+                remainingPercent: value, resetsAt: reset))
+        }
+        let points = UsageHistory.chartPoints(samples, remainingPercent: 50,
+            observedAt: samples.last!.observedAt, resetsAt: reset, maximumPoints: 20)
+        XCTAssertLessThanOrEqual(points.count, 20)
+        XCTAssertTrue(points.contains { $0.observedAt == epoch.addingTimeInterval(170 * 180) })
+        XCTAssertTrue(points.contains { $0.observedAt == epoch.addingTimeInterval(181 * 180) })
+        XCTAssertEqual(points.last?.observedAt, samples.last?.observedAt)
+    }
+
 }

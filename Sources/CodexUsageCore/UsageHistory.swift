@@ -144,11 +144,21 @@ public enum UsageHistory {
         if sourceBudget == 1 {
             selected = [source.count - 1]
         } else if selected.count > sourceBudget {
-            let middle = Array(selected.dropFirst().dropLast())
-            let slots = sourceBudget - 2
-            selected = [0] + (0..<slots).map {
-                middle[(2 * $0 + 1) * middle.count / (2 * slots)]
-            } + [source.count - 1]
+            selected = [0, source.count - 1]
+            let extrema = [source.indices.min(by: { source[$0].remainingPercent < source[$1].remainingPercent }),
+                           source.indices.max(by: { source[$0].remainingPercent < source[$1].remainingPercent })]
+            for index in extrema.compactMap({ $0 })
+                where selected.count < sourceBudget && !selected.contains(index) {
+                selected.append(index)
+            }
+            let candidates = boundary.sorted().filter { !selected.contains($0) }
+            let slots = sourceBudget - selected.count
+            if slots > 0 {
+                selected += (0..<slots).map {
+                    candidates[(2 * $0 + 1) * candidates.count / (2 * slots)]
+                }
+            }
+            selected.sort()
         } else {
             var available = sourceBudget - selected.count
             if available > 0 {

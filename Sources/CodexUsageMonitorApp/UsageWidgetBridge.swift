@@ -39,9 +39,13 @@ enum UsageWidgetBridge {
                     return WidgetWeeklyGraph(
                         id: key, name: limit.displayName, remainingPercent: window.remainingPercent,
                         resetsAt: window.resetsAt, exhaustionDate: estimates[key]?.exhaustionDate,
-                        points: UsageHistory.drawingSamples(history, maximumPoints: WidgetWeeklyGraph.maximumDrawingPoints)
-                            .map { WidgetHistoryPoint(observedAt: $0.observedAt,
-                                remainingPercent: $0.remainingPercent, segment: $0.segment) }
+                        points: UsageHistory.chartPoints(
+                            history, remainingPercent: window.remainingPercent,
+                            observedAt: snapshot.updatedAt, resetsAt: window.resetsAt,
+                            maximumPoints: WidgetWeeklyGraph.maximumDrawingPoints
+                        ).map { WidgetHistoryPoint(observedAt: $0.observedAt,
+                            remainingPercent: $0.remainingPercent, segment: 0,
+                            lightFromPrevious: $0.lightFromPrevious) }
                     )
                 }
             }

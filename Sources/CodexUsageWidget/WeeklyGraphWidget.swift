@@ -270,18 +270,22 @@ struct WidgetGraphView: View {
                     x: .value("Time", point.observedAt),
                     yStart: .value("Minimum", 0),
                     yEnd: .value("Remaining", point.remainingPercent),
-                    series: .value("Segment", "actual-\(point.segment)")
+                    series: .value("Segment", "actual-area")
                 )
                 .foregroundStyle(teal.opacity(0.15))
                 .interpolationMethod(.linear)
-                LineMark(
-                    x: .value("Time", point.observedAt),
-                    y: .value("Remaining", point.remainingPercent),
-                    series: .value("Segment", "actual-\(point.segment)")
-                )
-                .foregroundStyle(teal)
-                .lineStyle(StrokeStyle(lineWidth: 2))
-                .interpolationMethod(.linear)
+            }
+            ForEach(WidgetGraphDrawing.strokeRuns(points)) { run in
+                ForEach(run.points) { point in
+                    LineMark(
+                        x: .value("Time", point.observedAt),
+                        y: .value("Remaining", point.remainingPercent),
+                        series: .value("Segment", "actual-stroke-\(run.id)")
+                    )
+                    .foregroundStyle(teal.opacity(run.light ? 0.65 : 1))
+                    .lineStyle(StrokeStyle(lineWidth: 2))
+                    .interpolationMethod(.linear)
+                }
             }
             RuleMark(x: .value("Now", observedAt))
                 .foregroundStyle(.secondary.opacity(0.22))
@@ -392,7 +396,7 @@ struct WidgetGraphView: View {
             return CGPoint(x: x, y: y)
         }
         var segments: [(CGPoint, CGPoint)] = []
-        for (a, b) in zip(points, points.dropFirst()) where a.segment == b.segment {
+        for (a, b) in zip(points, points.dropFirst()) {
             if let start = position(a.observedAt, a.remainingPercent),
                let end = position(b.observedAt, b.remainingPercent) { segments.append((start, end)) }
         }
@@ -406,11 +410,17 @@ struct WidgetGraphView: View {
         _ graph: WidgetWeeklyGraph,
         observedAt: Date
     ) -> [WidgetHistoryPoint] {
-        let points = graph.visiblePoints(observedAt: observedAt)
+        var points = graph.visiblePoints(observedAt: observedAt)
             .filter { (0...100).contains($0.remainingPercent) }
             .sorted { $0.observedAt < $1.observedAt }
-        // The publisher already preserves extrema and caps the drawing copy.
-        // Keep reset segment identities intact and never manufacture a connected observation.
+        // Current snapshots include this drawing-only point. Add it for older snapshots too.
+        let range = graph.domain(observedAt: observedAt)
+        if let reset = graph.resetsAt, reset > observedAt,
+           reset.timeIntervalSince(observedAt) <= WidgetWeeklyGraph.duration,
+           let first = points.first, first.observedAt > range.lowerBound {
+            points.insert(WidgetHistoryPoint(observedAt: range.lowerBound, remainingPercent: 100,
+                                             segment: first.segment, lightFromPrevious: false), at: 0)
+        }
         return points
     }
 

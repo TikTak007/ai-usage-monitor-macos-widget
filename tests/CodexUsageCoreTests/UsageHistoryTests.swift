@@ -177,4 +177,44 @@ final class UsageHistoryTests: XCTestCase {
         XCTAssertEqual(flat.map(\.lightFromPrevious), [false, true, true])
     }
 
+    func testChartExcludesUnknownOldCycleButRetainsUnknownAfterMatchingReset() {
+        let reset = epoch.addingTimeInterval(UsageHistory.retention)
+        let oldUnknown = UsageHistorySample(observedAt: epoch.addingTimeInterval(86400),
+                                            remainingPercent: 20, resetsAt: nil)
+        let current = UsageHistorySample(observedAt: epoch.addingTimeInterval(2 * 86400),
+                                         remainingPercent: 90, resetsAt: reset)
+        let currentUnknown = UsageHistorySample(observedAt: current.observedAt.addingTimeInterval(180),
+                                                remainingPercent: 89, resetsAt: nil)
+        let points = UsageHistory.chartPoints([oldUnknown, current, currentUnknown],
+            remainingPercent: 89, observedAt: currentUnknown.observedAt, resetsAt: reset)
+        XCTAssertEqual(points.map(\.remainingPercent), [100, 90, 89])
+        XCTAssertFalse(points.contains { $0.remainingPercent == 20 })
+    }
+
+    func testChartSpreadsReducedPointsAcrossWeekAndRetainsLateExtrema() {
+        let reset = epoch.addingTimeInterval(UsageHistory.retention)
+        var samples: [UsageHistorySample] = []
+        for index in 0..<120 where index != 4 && index != 9 {
+            let value = index == 90 ? 0 : (index == 100 ? 100 : 50)
+            samples.append(UsageHistorySample(
+                observedAt: epoch.addingTimeInterval(Double(index * 180)),
+                remainingPercent: value, resetsAt: reset))
+        }
+        let points = UsageHistory.chartPoints(samples, remainingPercent: 50,
+            observedAt: samples.last!.observedAt, resetsAt: reset, maximumPoints: 10)
+        XCTAssertLessThanOrEqual(points.count, 10)
+        XCTAssertTrue(points.contains { $0.observedAt == epoch.addingTimeInterval(90 * 180) })
+        XCTAssertTrue(points.contains { $0.observedAt == epoch.addingTimeInterval(100 * 180) })
+        XCTAssertEqual(points.last?.remainingPercent, 50)
+    }
+
+    func testTwoPointLimitIncludesOriginAndLatest() {
+        let reset = epoch.addingTimeInterval(UsageHistory.retention)
+        let now = epoch.addingTimeInterval(86400)
+        let points = UsageHistory.chartPoints([], remainingPercent: 90,
+            observedAt: now, resetsAt: reset, maximumPoints: 2)
+        XCTAssertEqual(points.count, 2)
+        XCTAssertEqual(points.map(\.remainingPercent), [100, 90])
+    }
+
 }

@@ -108,10 +108,17 @@ public enum UsageHistory {
         let hasCycleStart = resetsAt.map {
             $0 > observedAt && $0.timeIntervalSince(observedAt) <= retention
         } ?? false
-        var source = samples.filter {
-            range.contains($0.observedAt) && $0.observedAt <= observedAt &&
-                (resetsAt == nil || $0.resetsAt == nil || $0.resetsAt == resetsAt)
+        let ordered = samples.filter {
+            range.contains($0.observedAt) && $0.observedAt <= observedAt
         }.sorted { $0.observedAt < $1.observedAt }
+        // A sample without reset metadata can belong to this cycle only after
+        // an observation established the matching reset. Otherwise it may be
+        // from the preceding cycle when the reset time changed irregularly.
+        var knownCycle: Date?
+        var source = ordered.filter { sample in
+            if let reset = sample.resetsAt { knownCycle = reset }
+            return resetsAt == nil || knownCycle == resetsAt
+        }
         if source.last?.observedAt == observedAt {
             source[source.count - 1] = UsageHistorySample(
                 observedAt: observedAt, remainingPercent: remainingPercent,
@@ -131,17 +138,37 @@ public enum UsageHistory {
                 boundary.insert(index)
             }
         }
-        let sourceBudget = max(2, maximumPoints - (hasCycleStart && source.first?.observedAt != range.lowerBound ? 1 : 0))
+        let sourceBudget = maximumPoints - (hasCycleStart && source.first?.observedAt != range.lowerBound ? 1 : 0)
         let preferredDates = Set(drawingSamples(source, maximumPoints: sourceBudget).map(\.observedAt))
         var selected = boundary.sorted()
-        if selected.count > sourceBudget {
+        if sourceBudget == 1 {
+            selected = [source.count - 1]
+        } else if selected.count > sourceBudget {
             let middle = Array(selected.dropFirst().dropLast())
             let slots = sourceBudget - 2
-            selected = [0] + (0..<slots).map { middle[$0 * middle.count / max(slots, 1)] } + [source.count - 1]
+            selected = [0] + (0..<slots).map {
+                middle[(2 * $0 + 1) * middle.count / (2 * slots)]
+            } + [source.count - 1]
         } else {
-            let available = sourceBudget - selected.count
-            selected += source.indices.filter { preferredDates.contains(source[$0].observedAt) && !boundary.contains($0) }
-                .prefix(available)
+            var available = sourceBudget - selected.count
+            if available > 0 {
+                let extrema = [source.indices.min(by: { source[$0].remainingPercent < source[$1].remainingPercent }),
+                               source.indices.max(by: { source[$0].remainingPercent < source[$1].remainingPercent })]
+                for index in extrema.compactMap({ $0 }) where available > 0 && !boundary.contains(index) && !selected.contains(index) {
+                    selected.append(index)
+                    available -= 1
+                }
+                let candidates = source.indices.filter {
+                    preferredDates.contains(source[$0].observedAt) && !boundary.contains($0) && !selected.contains($0)
+                }
+                if candidates.count <= available {
+                    selected += candidates
+                } else if available > 0 {
+                    selected += (0..<available).map {
+                        candidates[(2 * $0 + 1) * candidates.count / (2 * available)]
+                    }
+                }
+            }
             selected.sort()
         }
 

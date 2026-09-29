@@ -90,12 +90,53 @@ public struct WidgetHistoryPoint: Codable, Equatable, Identifiable, Sendable {
     public let observedAt: Date
     public let remainingPercent: Int
     public let segment: Int
+    /// Drawing-only connection style. Nil decodes snapshots written before this field existed.
+    public let lightFromPrevious: Bool?
     public var id: Date { observedAt }
 
-    public init(observedAt: Date, remainingPercent: Int, segment: Int) {
+    public init(observedAt: Date, remainingPercent: Int, segment: Int,
+                lightFromPrevious: Bool? = nil) {
         self.observedAt = observedAt
         self.remainingPercent = min(max(remainingPercent, 0), 100)
         self.segment = segment
+        self.lightFromPrevious = lightFromPrevious
+    }
+}
+
+public struct WidgetGraphStrokeRun: Identifiable, Equatable, Sendable {
+    public let id: Int
+    public let light: Bool
+    public let points: [WidgetHistoryPoint]
+
+    public init(id: Int, light: Bool, points: [WidgetHistoryPoint]) {
+        self.id = id
+        self.light = light
+        self.points = points
+    }
+}
+
+public enum WidgetGraphDrawing {
+    /// Each run includes both endpoints of its first edge; adjacent runs share one endpoint.
+    public static func strokeRuns(_ points: [WidgetHistoryPoint]) -> [WidgetGraphStrokeRun] {
+        guard points.count > 1 else { return [] }
+        var runs: [WidgetGraphStrokeRun] = []
+        var runPoints = [points[0]]
+        var runLight = false
+        for index in 1..<points.count {
+            let point = points[index]
+            // Older snapshots were already reduced, so their point spacing cannot
+            // distinguish a real gap from normal three-minute observations.
+            let light = point.lightFromPrevious ??
+                (point.segment != points[index - 1].segment)
+            if runPoints.count > 1 && light != runLight {
+                runs.append(WidgetGraphStrokeRun(id: runs.count, light: runLight, points: runPoints))
+                runPoints = [points[index - 1]]
+            }
+            runLight = light
+            runPoints.append(point)
+        }
+        runs.append(WidgetGraphStrokeRun(id: runs.count, light: runLight, points: runPoints))
+        return runs
     }
 }
 

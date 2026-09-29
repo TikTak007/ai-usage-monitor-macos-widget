@@ -68,4 +68,37 @@ final class WidgetGraphTests: XCTestCase {
         XCTAssertTrue(reduced.contains(source[1201]))
         XCTAssertEqual(source.count, 3360)
     }
+
+    func testStrokeRunsShareBoundaryPointsWithoutBreakingLine() throws {
+        let points = [
+            WidgetHistoryPoint(observedAt: now, remainingPercent: 100, segment: 0,
+                               lightFromPrevious: false),
+            WidgetHistoryPoint(observedAt: now.addingTimeInterval(3600), remainingPercent: 90,
+                               segment: 0, lightFromPrevious: true),
+            WidgetHistoryPoint(observedAt: now.addingTimeInterval(3780), remainingPercent: 89,
+                               segment: 0, lightFromPrevious: false),
+            WidgetHistoryPoint(observedAt: now.addingTimeInterval(7200), remainingPercent: 65,
+                               segment: 0, lightFromPrevious: true),
+        ]
+        let runs = WidgetGraphDrawing.strokeRuns(points)
+        XCTAssertEqual(runs.map(\.light), [true, false, true])
+        XCTAssertEqual(runs.map { $0.points.map(\.observedAt) },
+                       [[points[0].observedAt, points[1].observedAt],
+                        [points[1].observedAt, points[2].observedAt],
+                        [points[2].observedAt, points[3].observedAt]])
+        let encoded = try JSONEncoder().encode(points)
+        XCTAssertEqual(try JSONDecoder().decode([WidgetHistoryPoint].self, from: encoded), points)
+    }
+
+    func testLegacyPointWithoutConnectionStyleStillDecodes() throws {
+        let legacy = Data("{\"observedAt\":0,\"remainingPercent\":65,\"segment\":1}".utf8)
+        let point = try JSONDecoder().decode(WidgetHistoryPoint.self, from: legacy)
+        XCTAssertNil(point.lightFromPrevious)
+        let later = WidgetHistoryPoint(observedAt: point.observedAt.addingTimeInterval(360),
+                                       remainingPercent: 65, segment: 2)
+        XCTAssertEqual(WidgetGraphDrawing.strokeRuns([point, later]).map(\.light), [true])
+        let reducedNormal = WidgetHistoryPoint(observedAt: point.observedAt.addingTimeInterval(3600),
+                                               remainingPercent: 64, segment: 1)
+        XCTAssertEqual(WidgetGraphDrawing.strokeRuns([point, reducedNormal]).map(\.light), [false])
+    }
 }

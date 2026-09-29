@@ -15,6 +15,20 @@ public struct UsageHistorySample: Codable, Equatable, Identifiable, Sendable {
     }
 }
 
+/// A point used only for drawing. The start point and light connections are never recorded.
+public struct UsageChartPoint: Equatable, Identifiable, Sendable {
+    public let observedAt: Date
+    public let remainingPercent: Int
+    public let lightFromPrevious: Bool
+    public var id: Date { observedAt }
+
+    public init(observedAt: Date, remainingPercent: Int, lightFromPrevious: Bool) {
+        self.observedAt = observedAt
+        self.remainingPercent = remainingPercent
+        self.lightFromPrevious = lightFromPrevious
+    }
+}
+
 public enum UsageHistory {
     public static let retention: TimeInterval = 7 * 24 * 60 * 60
     public static let maximumSamples = 4_096
@@ -81,5 +95,76 @@ public enum UsageHistory {
             }
         }
         return selected.sorted().map { samples[$0] }
+    }
+
+    /// Draw one current cycle. Classify gaps before reducing points so normal three-minute
+    /// observations do not become light merely because the rendering copy is sparse.
+    public static func chartPoints(
+        _ samples: [UsageHistorySample], remainingPercent: Int,
+        observedAt: Date, resetsAt: Date?, maximumPoints: Int = 600
+    ) -> [UsageChartPoint] {
+        guard (0...100).contains(remainingPercent), maximumPoints >= 2 else { return [] }
+        let range = chartDomain(observedAt: observedAt, resetsAt: resetsAt)
+        let hasCycleStart = resetsAt.map {
+            $0 > observedAt && $0.timeIntervalSince(observedAt) <= retention
+        } ?? false
+        var source = samples.filter {
+            range.contains($0.observedAt) && $0.observedAt <= observedAt &&
+                (resetsAt == nil || $0.resetsAt == nil || $0.resetsAt == resetsAt)
+        }.sorted { $0.observedAt < $1.observedAt }
+        if source.last?.observedAt == observedAt {
+            source[source.count - 1] = UsageHistorySample(
+                observedAt: observedAt, remainingPercent: remainingPercent,
+                resetsAt: resetsAt, segment: source[source.count - 1].segment)
+        } else {
+            source.append(UsageHistorySample(observedAt: observedAt, remainingPercent: remainingPercent,
+                                             resetsAt: resetsAt, segment: source.last?.segment ?? 0))
+        }
+        guard !source.isEmpty else { return [] }
+
+        // Keep both ends of a missing interval whenever the drawing limit permits it.
+        var boundary = Set([0, source.count - 1])
+        if source.count > 1 {
+            for index in 1..<source.count
+                where source[index].observedAt.timeIntervalSince(source[index - 1].observedAt) > maximumConnectedGap {
+                boundary.insert(index - 1)
+                boundary.insert(index)
+            }
+        }
+        let sourceBudget = max(2, maximumPoints - (hasCycleStart && source.first?.observedAt != range.lowerBound ? 1 : 0))
+        let preferredDates = Set(drawingSamples(source, maximumPoints: sourceBudget).map(\.observedAt))
+        var selected = boundary.sorted()
+        if selected.count > sourceBudget {
+            let middle = Array(selected.dropFirst().dropLast())
+            let slots = sourceBudget - 2
+            selected = [0] + (0..<slots).map { middle[$0 * middle.count / max(slots, 1)] } + [source.count - 1]
+        } else {
+            let available = sourceBudget - selected.count
+            selected += source.indices.filter { preferredDates.contains(source[$0].observedAt) && !boundary.contains($0) }
+                .prefix(available)
+            selected.sort()
+        }
+
+        var points: [UsageChartPoint] = []
+        if hasCycleStart && source[0].observedAt > range.lowerBound {
+            points.append(UsageChartPoint(observedAt: range.lowerBound, remainingPercent: 100,
+                                          lightFromPrevious: false))
+        }
+        var previousIndex: Int?
+        for index in selected {
+            let light: Bool
+            if let previousIndex {
+                light = ((previousIndex + 1)...index).contains {
+                    source[$0].observedAt.timeIntervalSince(source[$0 - 1].observedAt) > maximumConnectedGap
+                }
+            } else {
+                light = !points.isEmpty
+            }
+            points.append(UsageChartPoint(observedAt: source[index].observedAt,
+                                          remainingPercent: source[index].remainingPercent,
+                                          lightFromPrevious: light))
+            previousIndex = index
+        }
+        return points
     }
 }

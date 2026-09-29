@@ -106,4 +106,75 @@ final class UsageHistoryTests: XCTestCase {
         }
     }
 
+    func testChartStartsAtResetAndConnectsFirstNinetyPercentObservation() {
+        let reset = epoch.addingTimeInterval(UsageHistory.retention)
+        let observed = epoch.addingTimeInterval(3600)
+        let history = [UsageHistorySample(observedAt: observed, remainingPercent: 90,
+                                          resetsAt: reset)]
+        let points = UsageHistory.chartPoints(history, remainingPercent: 90,
+                                              observedAt: observed, resetsAt: reset)
+        XCTAssertEqual(points.map(\.remainingPercent), [100, 90])
+        XCTAssertEqual(points.map(\.observedAt), [epoch, observed])
+        XCTAssertEqual(points.map(\.lightFromPrevious), [false, true])
+        XCTAssertEqual(history.count, 1, "The drawing origin must not be recorded")
+    }
+
+    func testChartConnectsSixMinuteAndLongGapsButKeepsContinuousEdgesNormal() {
+        let reset = epoch.addingTimeInterval(UsageHistory.retention)
+        let times: [TimeInterval] = [180, 360, 720, 900, 2 * 24 * 3600]
+        let history = zip(times, [99, 98, 97, 96, 65]).map { offset, value in
+            UsageHistorySample(observedAt: epoch.addingTimeInterval(offset),
+                               remainingPercent: value, resetsAt: reset)
+        }
+        let points = UsageHistory.chartPoints(history, remainingPercent: 65,
+            observedAt: epoch.addingTimeInterval(2 * 24 * 3600), resetsAt: reset)
+        XCTAssertEqual(points.map(\.remainingPercent), [100, 99, 98, 97, 96, 65])
+        XCTAssertEqual(points.map(\.lightFromPrevious), [false, true, false, true, false, true])
+    }
+
+    func testChartClassifiesGapsBeforeReducingThreeMinuteHistory() {
+        let reset = epoch.addingTimeInterval(UsageHistory.retention)
+        let history = (0..<3360).map { index in
+            UsageHistorySample(observedAt: epoch.addingTimeInterval(Double(index * 180)),
+                               remainingPercent: 100 - index * 100 / 3360, resetsAt: reset)
+        }
+        let points = UsageHistory.chartPoints(history, remainingPercent: 1,
+            observedAt: history.last!.observedAt, resetsAt: reset, maximumPoints: 200)
+        XCTAssertLessThanOrEqual(points.count, 200)
+        XCTAssertEqual(points.last?.remainingPercent, 1)
+        XCTAssertTrue(points.allSatisfy { !$0.lightFromPrevious })
+    }
+
+    func testChartUsesOnlyCurrentCycleAndDoesNotInventOriginWithoutReset() {
+        let nextReset = epoch.addingTimeInterval(UsageHistory.retention)
+        let oldReset = epoch.addingTimeInterval(3600)
+        let old = UsageHistorySample(observedAt: epoch.addingTimeInterval(180),
+                                     remainingPercent: 20, resetsAt: oldReset)
+        let current = UsageHistorySample(observedAt: epoch.addingTimeInterval(7200),
+                                         remainingPercent: 90, resetsAt: nextReset)
+        let now = current.observedAt
+        let currentPoints = UsageHistory.chartPoints([old, current], remainingPercent: 90,
+                                                      observedAt: now, resetsAt: nextReset)
+        XCTAssertEqual(currentPoints.map(\.remainingPercent), [100, 90])
+        let unknownPoints = UsageHistory.chartPoints([current], remainingPercent: 90,
+                                                      observedAt: now, resetsAt: nil)
+        XCTAssertEqual(unknownPoints.map(\.remainingPercent), [90])
+    }
+
+    func testChartCanStartFromCurrentValueAloneAndKeepHorizontalMissingGap() {
+        let reset = epoch.addingTimeInterval(UsageHistory.retention)
+        let first = epoch.addingTimeInterval(180)
+        let now = epoch.addingTimeInterval(3 * 24 * 3600)
+        let onlyCurrent = UsageHistory.chartPoints([], remainingPercent: 90,
+            observedAt: first, resetsAt: reset)
+        XCTAssertEqual(onlyCurrent.map(\.remainingPercent), [100, 90])
+        XCTAssertEqual(onlyCurrent.map(\.lightFromPrevious), [false, true])
+
+        let flat = UsageHistory.chartPoints([
+            UsageHistorySample(observedAt: first, remainingPercent: 65, resetsAt: reset)
+        ], remainingPercent: 65, observedAt: now, resetsAt: reset)
+        XCTAssertEqual(flat.map(\.remainingPercent), [100, 65, 65])
+        XCTAssertEqual(flat.map(\.lightFromPrevious), [false, true, true])
+    }
+
 }

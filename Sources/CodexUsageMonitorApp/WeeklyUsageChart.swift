@@ -1,5 +1,6 @@
 import Charts
 import CodexUsageCore
+import CodexUsageShared
 import SwiftUI
 
 struct WeeklyUsageChart: View {
@@ -23,8 +24,12 @@ struct WeeklyUsageChart: View {
               estimate.exhaustionDate > observedAt, estimate.exhaustionDate < reset, estimate.exhaustionDate <= end else { return nil }
         return estimate
     }
-    private var points: [UsageHistorySample] {
-        UsageHistory.drawingSamples(samples.filter { $0.observedAt >= start && $0.observedAt <= observedAt })
+    private var points: [WidgetHistoryPoint] {
+        UsageHistory.chartPoints(samples, remainingPercent: window.remainingPercent,
+                                 observedAt: observedAt, resetsAt: window.resetsAt).map {
+            WidgetHistoryPoint(observedAt: $0.observedAt, remainingPercent: $0.remainingPercent,
+                               segment: 0, lightFromPrevious: $0.lightFromPrevious)
+        }
     }
 
     var body: some View {
@@ -39,14 +44,19 @@ struct WeeklyUsageChart: View {
             Chart {
                 ForEach(points) { sample in
                     AreaMark(x: .value("Time", sample.observedAt), y: .value("Remaining", sample.remainingPercent),
-                             series: .value("Series", "history-\(sample.segment)"))
+                             series: .value("Series", "history"))
                         .foregroundStyle(LinearGradient(colors: [.teal.opacity(0.28), .teal.opacity(0.01)],
                                                         startPoint: .top, endPoint: .bottom))
-                    LineMark(x: .value("Time", sample.observedAt), y: .value("Remaining", sample.remainingPercent),
-                             series: .value("Series", "history-\(sample.segment)"))
-                        .foregroundStyle(.teal).lineStyle(StrokeStyle(lineWidth: 1.5))
-                        .accessibilityLabel(sample.observedAt.formatted(date: .abbreviated, time: .shortened))
-                        .accessibilityValue("\(sample.remainingPercent) percent remaining")
+                }
+                ForEach(WidgetGraphDrawing.strokeRuns(points)) { run in
+                    ForEach(run.points) { sample in
+                        LineMark(x: .value("Time", sample.observedAt), y: .value("Remaining", sample.remainingPercent),
+                                 series: .value("Series", "history-stroke-\(run.id)"))
+                            .foregroundStyle(Color.teal.opacity(run.light ? 0.65 : 1))
+                            .lineStyle(StrokeStyle(lineWidth: 1.5))
+                            .accessibilityLabel(sample.observedAt.formatted(date: .abbreviated, time: .shortened))
+                            .accessibilityValue("\(sample.remainingPercent) percent remaining")
+                    }
                 }
                 if let forecast {
                     ForEach([observedAt, forecast.exhaustionDate], id: \.self) { date in

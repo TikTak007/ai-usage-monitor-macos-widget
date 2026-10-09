@@ -1,0 +1,8 @@
+[project]
+name = "codex-usage-monitor"
+version = "0.1.0"
+description = "Phase 1 PoC for reading Codex usage through codex app-server"
+requires-python = ">=3.11"
+
+[tool.ruff]
+line-length = 100

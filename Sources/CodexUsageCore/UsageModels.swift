@@ -36,6 +36,7 @@ public struct UsageLimit: Identifiable, Equatable, Sendable {
     public let rateLimitReachedType: String?
     public let spendControlReached: Bool?
     public let windows: [UsageWindow]
+    public let creditBalance: UsageCreditBalance?
 
     public var id: String { limitID }
 
@@ -45,7 +46,8 @@ public struct UsageLimit: Identifiable, Equatable, Sendable {
         planType: String?,
         rateLimitReachedType: String?,
         spendControlReached: Bool?,
-        windows: [UsageWindow]
+        windows: [UsageWindow],
+        creditBalance: UsageCreditBalance? = nil
     ) {
         self.limitID = limitID
         self.displayName = displayName
@@ -53,6 +55,7 @@ public struct UsageLimit: Identifiable, Equatable, Sendable {
         self.rateLimitReachedType = rateLimitReachedType
         self.spendControlReached = spendControlReached
         self.windows = windows
+        self.creditBalance = creditBalance
     }
 }
 
@@ -96,6 +99,10 @@ public struct UsageResetCreditsSummary: Equatable, Sendable {
 }
 
 public struct UsageSnapshot: Equatable, Sendable {
+    public var creditBalance: UsageCreditBalance? {
+        limits.first { $0.limitID == "codex" }?.creditBalance
+    }
+
     public let limits: [UsageLimit]
     public let resetCredits: UsageResetCreditsSummary?
     public let updatedAt: Date

@@ -159,8 +159,25 @@ public enum UsageNormalizer {
             planType: planType,
             rateLimitReachedType: reachedType,
             spendControlReached: spendControlReached,
-            windows: windows
+            windows: windows,
+            creditBalance: parseCreditBalance(snapshot["credits"])
         )
+    }
+
+    private static func parseCreditBalance(_ value: Any?) -> UsageCreditBalance? {
+        guard let raw = value as? [String: Any],
+              let hasCredits = raw["hasCredits"] as? NSNumber,
+              CFGetTypeID(hasCredits) == CFBooleanGetTypeID(),
+              let unlimited = raw["unlimited"] as? NSNumber,
+              CFGetTypeID(unlimited) == CFBooleanGetTypeID()
+        else { return nil }
+        if unlimited.boolValue { return .unlimited }
+        guard let string = raw["balance"] as? String,
+              string.range(of: #"^-?[0-9]+(?:\.[0-9]+)?$"#, options: .regularExpression) != nil,
+              let amount = Decimal(string: string, locale: Locale(identifier: "en_US_POSIX")),
+              !amount.isNaN
+        else { return nil }
+        return .amount(amount)
     }
 
     private static func parseWindow(

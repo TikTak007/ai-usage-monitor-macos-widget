@@ -96,6 +96,7 @@ struct UsagePanel: View {
         if let snapshot = model.snapshot {
             ScrollView {
                 LazyVStack(spacing: 10) {
+                    CreditsBalanceCard(balance: snapshot.creditBalance, isStale: hasRefreshFailure)
                     ResetCreditsCard(summary: snapshot.resetCredits)
                     ForEach(Array(snapshot.limits.prefix(2))) { limit in
                         LimitCard(limit: limit, paceEstimates: model.paceEstimates,
@@ -141,6 +142,11 @@ struct UsagePanel: View {
         }
     }
 
+    private var hasRefreshFailure: Bool {
+        if case .failed = model.state { return true }
+        return false
+    }
+
     private var panelHeight: CGFloat {
         let contentHeight = measuredContentHeight > 0
             ? measuredContentHeight
@@ -171,10 +177,10 @@ struct UsagePanel: View {
         } else {
             hasErrorBanner = false
         }
-        let itemCount = snapshot.limits.count + 1 + (hasErrorBanner ? 1 : 0)
+        let itemCount = snapshot.limits.count + 1 + 1 + (hasErrorBanner ? 1 : 0)
         let spacing = CGFloat(max(itemCount - 1, 0)) * 10
         let errorBannerHeight: CGFloat = hasErrorBanner ? 44 : 0
-        return 20 + cardHeight + resetCreditsHeight + spacing + errorBannerHeight
+        return 20 + 84 + cardHeight + resetCreditsHeight + spacing + errorBannerHeight
     }
 
     private var footer: some View {

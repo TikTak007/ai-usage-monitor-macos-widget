@@ -7,31 +7,48 @@ struct UsagePanel: View {
     @ObservedObject var model: UsageViewModel
     @AppStorage("appearanceMode") private var appearanceRawValue = AppearanceMode.system.rawValue
     @State private var measuredContentHeight: CGFloat = 0
+    @State private var measuredChromeHeight: CGFloat = 0
+    @State private var availableScreenHeight: CGFloat = 0
+    // A finite viewport override is used only by the native layout regression harness.
+    var maximumHeightOverride: CGFloat? = nil
 
     private let minimumPanelHeight: CGFloat = 220
     private let panelChromeHeight: CGFloat = 112
 
     private var maximumPanelHeight: CGFloat {
-        let availableHeight = NSScreen.main?.visibleFrame.height ?? 620
-        return min(680, max(420, availableHeight - 16))
+        if let maximumHeightOverride { return maximumHeightOverride }
+        let availableHeight = availableScreenHeight > 0
+            ? availableScreenHeight : (NSScreen.main?.visibleFrame.height ?? 620)
+        return max(minimumPanelHeight, floor(availableHeight - 16))
     }
 
     var body: some View {
         VStack(spacing: 0) {
             header
-            Divider()
+                .fixedSize(horizontal: false, vertical: true)
+                .background(chromeMeasurement)
+            Divider().frame(height: 1)
             content
-            Divider()
+            Divider().frame(height: 1)
             footer
+                .fixedSize(horizontal: false, vertical: true)
+                .background(chromeMeasurement)
         }
         .frame(width: 360, height: panelHeight)
         .background(.regularMaterial)
-        .background(PanelWindowSize(height: panelHeight))
+        .background(PanelWindowSize(height: panelHeight) { height in
+            guard abs(height - availableScreenHeight) > 0.5 else { return }
+            availableScreenHeight = height
+        })
         .background(PanelWindowAppearance(mode: appearanceMode))
         .preferredColorScheme(appearanceMode.colorScheme)
         .onPreferenceChange(ContentHeightPreferenceKey.self) { height in
             guard height > 0, abs(height - measuredContentHeight) > 0.5 else { return }
             measuredContentHeight = height
+        }
+        .onPreferenceChange(PanelChromeHeightPreferenceKey.self) { height in
+            guard height > 0, abs(height - measuredChromeHeight) > 0.5 else { return }
+            measuredChromeHeight = height
         }
         .onChange(of: appearanceRawValue) { _ in
             model.publishCurrentSnapshot()
@@ -95,7 +112,7 @@ struct UsagePanel: View {
     private var content: some View {
         if let snapshot = model.snapshot {
             ScrollView {
-                LazyVStack(spacing: 10) {
+                VStack(spacing: 10) {
                     CreditsBalanceCard(balance: snapshot.creditBalance, isStale: hasRefreshFailure)
                     ResetCreditsCard(summary: snapshot.resetCredits)
                     ForEach(Array(snapshot.limits.prefix(2))) { limit in
@@ -110,6 +127,7 @@ struct UsagePanel: View {
                         ErrorBanner(message: message)
                     }
                 }
+                .fixedSize(horizontal: false, vertical: true)
                 .padding(.horizontal, 14)
                 .padding(.vertical, 10)
                 .background {
@@ -121,6 +139,7 @@ struct UsagePanel: View {
                     }
                 }
             }
+            .scrollDisabled(measuredContentHeight > 0 && desiredPanelHeight <= maximumPanelHeight)
         } else if case .failed(let message) = model.state {
             VStack(spacing: 12) {
                 Image(systemName: "exclamationmark.triangle")
@@ -147,14 +166,20 @@ struct UsagePanel: View {
         return false
     }
 
+    private var chromeMeasurement: some View {
+        GeometryReader { proxy in
+            Color.clear.preference(key: PanelChromeHeightPreferenceKey.self, value: proxy.size.height)
+        }
+    }
+
+    private var desiredPanelHeight: CGFloat {
+        let contentHeight = measuredContentHeight > 0 ? measuredContentHeight : estimatedContentHeight
+        let chromeHeight = measuredChromeHeight > 0 ? measuredChromeHeight : panelChromeHeight
+        return ceil(max(minimumPanelHeight, chromeHeight + 2 + contentHeight))
+    }
+
     private var panelHeight: CGFloat {
-        let contentHeight = measuredContentHeight > 0
-            ? measuredContentHeight
-            : estimatedContentHeight
-        return min(
-            maximumPanelHeight,
-            max(minimumPanelHeight, panelChromeHeight + contentHeight)
-        )
+        min(maximumPanelHeight, desiredPanelHeight)
     }
 
     private var estimatedContentHeight: CGFloat {
@@ -256,19 +281,24 @@ private final class PanelAppearanceView: NSView {
 /// Keep the hosted window's content rect equal to the actual SwiftUI panel height.
 private struct PanelWindowSize: NSViewRepresentable {
     let height: CGFloat
+    var screenHeightChanged: ((CGFloat) -> Void)? = nil
 
     func makeNSView(context: Context) -> PanelSizingView {
         let view = PanelSizingView()
+        view.screenHeightChanged = screenHeightChanged
         view.requestedHeight = height
         return view
     }
 
     func updateNSView(_ view: PanelSizingView, context: Context) {
+        view.screenHeightChanged = screenHeightChanged
         view.requestedHeight = height
     }
 }
 
 private final class PanelSizingView: NSView {
+    var screenHeightChanged: ((CGFloat) -> Void)?
+    private var lastScreenHeight: CGFloat = 0
     var requestedHeight: CGFloat = 0 {
         didSet { scheduleResize() }
     }
@@ -283,6 +313,11 @@ private final class PanelSizingView: NSView {
         DispatchQueue.main.async { [weak self] in
             guard let self, let window = self.window,
                   self.requestedHeight > 0 else { return }
+            if let available = window.screen?.visibleFrame.height,
+               abs(available - self.lastScreenHeight) > 0.5 {
+                self.lastScreenHeight = available
+                self.screenHeightChanged?(available)
+            }
             let current = window.contentLayoutRect.height
             guard abs(current - self.requestedHeight) > 1 else { return }
             let top = window.frame.maxY
@@ -292,6 +327,14 @@ private final class PanelSizingView: NSView {
             frame.origin = NSPoint(x: left, y: top - frame.height)
             window.setFrame(frame, display: true)
         }
+    }
+}
+
+private struct PanelChromeHeightPreferenceKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value += nextValue()
     }
 }
 

@@ -96,6 +96,18 @@ final class UsageCreditBalanceTests: XCTestCase {
         XCTAssertNil(UsageSnapshot(limits: [], updatedAt: Date()).creditBalance)
     }
 
+    func testCreditBalanceAndBankedResetsCoexist() throws {
+        let snapshot = try UsageNormalizer.normalize([
+            "rateLimits": bucket(credits: ["hasCredits": true, "unlimited": false, "balance": "42420.5"]),
+            "rateLimitResetCredits": ["availableCount": 2, "credits": [
+                ["id": "synthetic-reset", "status": "available", "resetType": "codexRateLimits", "expiresAt": 1900000000]
+            ]]
+        ])
+        XCTAssertEqual(snapshot.creditBalance, .amount(Decimal(string: "42420.5")!))
+        XCTAssertEqual(snapshot.resetCredits?.availableCount, 2)
+        XCTAssertEqual(snapshot.resetCredits?.credits?.count, 1)
+    }
+
     private func normalize(_ credits: Any?) throws -> UsageSnapshot {
         try UsageNormalizer.normalize(["rateLimits": bucket(credits: credits)])
     }

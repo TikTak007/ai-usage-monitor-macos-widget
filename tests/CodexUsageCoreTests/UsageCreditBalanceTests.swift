@@ -4,10 +4,10 @@ import XCTest
 final class UsageCreditBalanceTests: XCTestCase {
     private let locale = Locale(identifier: "en_US")
 
-    func testNormalizesExactDecimalBalanceAndRemovesInsignificantZeros() throws {
+    func testPreservesExactDecimalBalanceAndDisplaysWholeCredits() throws {
         let snapshot = try normalize(["hasCredits": true, "unlimited": false, "balance": "42420.1250000000"])
         XCTAssertEqual(snapshot.creditBalance, .amount(Decimal(string: "42420.125")!))
-        XCTAssertEqual(snapshot.creditBalance?.formattedAmount(locale: locale), "42,420.125")
+        XCTAssertEqual(snapshot.creditBalance?.formattedAmount(locale: locale), "42,420")
         XCTAssertEqual(snapshot.limits.first?.windows.first?.remainingPercent, 76)
     }
 
@@ -51,19 +51,25 @@ final class UsageCreditBalanceTests: XCTestCase {
         }
     }
 
-    func testTinyFractionDoesNotDisplayAsZero() throws {
-        let balance = try normalize(["hasCredits": true, "unlimited": false, "balance": "0.0000000001"])
-        XCTAssertEqual(balance.creditBalance?.formattedAmount(locale: locale), "0.0000000001")
+    func testFormattingRoundsToNearestWholeCredit() throws {
+        let cases = [("0.0000000001", "0"), ("42420.49", "42,420"),
+                     ("42420.5", "42,421"), ("42421.5", "42,422"),
+                     ("999.999", "1,000")]
+        for (input, expected) in cases {
+            let balance = try normalize(["hasCredits": true, "unlimited": false, "balance": input])
+            XCTAssertEqual(balance.creditBalance, .amount(Decimal(string: input)!))
+            XCTAssertEqual(balance.creditBalance?.formattedAmount(locale: locale), expected)
+        }
     }
 
     func testBalanceDoesNotPassThroughBinaryFloatingPoint() throws {
         let snapshot = try normalize(["hasCredits": true, "unlimited": false, "balance": "9007199254740993.125"])
-        XCTAssertEqual(snapshot.creditBalance?.formattedAmount(locale: locale), "9,007,199,254,740,993.125")
+        XCTAssertEqual(snapshot.creditBalance?.formattedAmount(locale: locale), "9,007,199,254,740,993")
     }
 
     func testFormattingUsesTheRequestedLocale() {
         XCTAssertEqual(UsageCreditBalance.amount(Decimal(string: "42420.5")!)
-            .formattedAmount(locale: Locale(identifier: "de_DE")), "42.420,5")
+            .formattedAmount(locale: Locale(identifier: "de_DE")), "42.421")
     }
 
     func testMapIsAuthoritativeAndDoesNotBorrowLegacyCredits() throws {

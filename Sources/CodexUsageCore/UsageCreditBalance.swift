@@ -10,8 +10,11 @@ public enum UsageCreditBalance: Equatable, Sendable {
         case .unlimited:
             return "Unlimited"
         case .amount(let balance):
-            return balance.formatted(
-                .number.precision(.fractionLength(0...38)).locale(locale)
+            var value = balance
+            var rounded = Decimal()
+            NSDecimalRound(&rounded, &value, 0, .plain)
+            return rounded.formatted(
+                .number.precision(.fractionLength(0)).locale(locale)
             )
         }
     }
